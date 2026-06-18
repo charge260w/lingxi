@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#05080f" />
+<title>灵犀 · AI 读心仪</title>
+<style>
+  :root{
+    --bg0:#04060d; --bg1:#070b18; --bg2:#0b1226;
+    --card:rgba(18,26,48,.55); --card-brd:rgba(90,160,255,.18);
+    --ink:#eaf2ff; --ink-dim:#93a6c8; --ink-faint:#5d6f93;
+    --cyan:#21e6ff; --blue:#3b82f6; --magenta:#ff3df0; --pink:#ff5db1;
+    --lime:#9dff3d; --amber:#ffb53d; --red:#ff4d6d; --good:#28e0a0;
+    --accent:var(--cyan);
+    --r:20px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    margin:0; color:var(--ink);
+    font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+    background:
+      radial-gradient(1200px 760px at 6% -12%, #10224a 0%, transparent 55%),
+      radial-gradient(1000px 720px at 110% 4%, #2a0e44 0%, transparent 52%),
+      radial-gradient(900px 900px at 50% 120%, #07213a 0%, transparent 60%),
+      linear-gradient(160deg,var(--bg0),var(--bg1) 55%,var(--bg2));
+    background-attachment:fixed; min-height:100dvh; overflow-x:hidden;
+  }
+  .grid-bg{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+    background-image:linear-gradient(rgba(90,160,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(90,160,255,.05) 1px,transparent 1px);
+    background-size:46px 46px;mask-image:radial-gradient(circle at 50% 30%,#000 0%,transparent 78%)}
+  .app{max-width:1240px;margin:0 auto;padding:16px clamp(12px,3vw,26px) 46px;position:relative;z-index:1}
+
+  header{display:flex;align-items:center;gap:13px;flex-wrap:wrap;margin-bottom:15px}
+  .logo{width:50px;height:50px;border-radius:15px;flex:0 0 auto;display:grid;place-items:center;font-size:25px;position:relative;
+    background:radial-gradient(circle at 35% 30%,#27407a,#0b1430);border:1px solid rgba(120,200,255,.35);
+    box-shadow:0 10px 30px rgba(33,230,255,.28), inset 0 0 18px rgba(33,230,255,.25)}
+  .logo::after{content:"";position:absolute;inset:-3px;border-radius:18px;border:1px solid rgba(33,230,255,.4);
+    animation:halo 3s ease-in-out infinite}
+  @keyframes halo{50%{transform:scale(1.12);opacity:.4}}
+  .title h1{margin:0;font-size:clamp(18px,4.4vw,26px);letter-spacing:.5px;font-weight:800;
+    background:linear-gradient(90deg,#eafcff,#7fd6ff 40%,#ff8be8);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .title p{margin:2px 0 0;color:var(--ink-dim);font-size:12.5px}
+  .stat-pills{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  .pill{display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--card-brd);
+    padding:7px 12px;border-radius:999px;font-size:12px;color:var(--ink-dim);backdrop-filter:blur(8px)}
+  .dot{width:9px;height:9px;border-radius:50%;background:#445;transition:.3s}
+  .dot.live{background:var(--good);box-shadow:0 0 0 0 rgba(40,224,160,.7);animation:pulse 1.6s infinite}
+  @keyframes pulse{70%{box-shadow:0 0 0 9px rgba(40,224,160,0)}}
+
+  .stage{display:flex;gap:18px;align-items:stretch}
+  @media (max-width:980px){.stage{flex-direction:column}}
+
+  .video-wrap{position:relative;flex:1 1 auto;min-width:0;border-radius:var(--r);overflow:hidden;
+    background:#05070f;aspect-ratio:4/3;border:1.5px solid var(--card-brd);
+    box-shadow:0 30px 70px rgba(0,0,0,.55), 0 0 0 1px rgba(33,230,255,.08), 0 0 70px -16px var(--accent);
+    transition:box-shadow .6s}
+  video,#mesh,#fx{position:absolute;inset:0;width:100%;height:100%}
+  video,#mesh{object-fit:cover}
+  .mirror{transform:scaleX(-1)}
+  #fx{pointer-events:none}
+  /* 心跳光环：随测得心率脉动 */
+  .pulse-ring{position:absolute;inset:0;border-radius:var(--r);pointer-events:none;z-index:4;
+    box-shadow:inset 0 0 0 0 rgba(33,230,255,0);transition:box-shadow .12s ease-out}
+  .pulse-ring.beat{box-shadow:inset 0 0 60px -6px var(--accent), inset 0 0 0 2px var(--accent)}
+  /* 采集扫描线 */
+  .scanline{position:absolute;left:0;right:0;height:2px;z-index:5;pointer-events:none;display:none;
+    background:linear-gradient(90deg,transparent,var(--cyan),transparent);box-shadow:0 0 18px var(--cyan)}
+  .scanline.on{display:block;animation:scan 2.4s linear infinite}
+  @keyframes scan{0%{top:8%}100%{top:92%}}
+
+  .emo-badge{position:absolute;left:13px;top:13px;display:flex;align-items:center;gap:12px;z-index:6;
+    background:rgba(8,14,28,.55);backdrop-filter:blur(12px);border:1px solid var(--card-brd);
+    padding:10px 15px 10px 11px;border-radius:16px;max-width:74%;transition:.3s}
+  .emo-face{font-size:38px;line-height:1;filter:drop-shadow(0 4px 10px rgba(0,0,0,.5));animation:pop .4s}
+  @keyframes pop{0%{transform:scale(.4)}60%{transform:scale(1.18)}}
+  .emo-name{font-size:20px;font-weight:800;display:flex;align-items:baseline;gap:7px;color:var(--accent)}
+  .emo-name small{font-size:11px;font-weight:600;color:var(--ink-dim);letter-spacing:1px;text-transform:uppercase}
+  .emo-sub{margin-top:3px;font-size:11.5px;color:var(--ink-dim)}
+  .emo-conf{margin-top:6px;height:6px;width:150px;max-width:42vw;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden}
+  .emo-conf i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--accent),#fff);transition:width .25s}
+
+  /* 读心条 */
+  .mind{position:absolute;left:13px;bottom:13px;right:13px;z-index:6;display:flex;align-items:center;gap:13px;
+    background:linear-gradient(100deg,rgba(8,14,28,.72),rgba(20,10,40,.6));backdrop-filter:blur(14px);
+    border:1px solid var(--card-brd);border-radius:16px;padding:12px 16px;max-width:560px}
+  .mind .mi{font-size:30px;line-height:1;flex:0 0 auto;filter:drop-shadow(0 3px 8px rgba(0,0,0,.5))}
+  .mind .mt{min-width:0}
+  .mind .mt b{display:block;font-size:16px;font-weight:800;color:#fff;letter-spacing:.3px}
+  .mind .mt b span{font-size:11px;font-weight:600;color:var(--accent);margin-left:7px;letter-spacing:1px}
+  .mind .mt em{font-style:normal;display:block;font-size:11.5px;color:var(--ink-dim);margin-top:2px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .timeline{position:absolute;right:12px;top:12px;display:flex;gap:4px;background:rgba(8,14,28,.5);z-index:6;
+    border:1px solid var(--card-brd);border-radius:999px;padding:6px 9px;backdrop-filter:blur(8px);font-size:15px;max-width:48%;overflow:hidden}
+  .timeline span{animation:pop .3s}
+
+  /* 灵犀伴随球 */
+  .orb{position:absolute;right:14px;bottom:78px;width:62px;height:62px;border-radius:50%;z-index:7;cursor:default;
+    background:radial-gradient(circle at 34% 30%,#bdf6ff,#21a8ff 42%,#7a3df0 100%);
+    box-shadow:0 0 30px rgba(33,230,255,.6),inset 0 -6px 14px rgba(40,10,90,.6),inset 0 5px 12px rgba(255,255,255,.5);
+    display:none;animation:float 4s ease-in-out infinite}
+  @keyframes float{50%{transform:translateY(-8px)}}
+  .orb::before{content:"";position:absolute;left:16px;top:13px;width:13px;height:9px;border-radius:50%;background:rgba(255,255,255,.85);filter:blur(1px)}
+  .o-bubble{position:absolute;right:16px;bottom:150px;max-width:248px;z-index:8;
+    background:linear-gradient(135deg,#eafaff,#dbe8ff);color:#10233f;font-weight:600;font-size:13px;line-height:1.55;
+    padding:11px 14px;border-radius:15px 15px 4px 15px;box-shadow:0 12px 30px rgba(0,0,0,.45);
+    opacity:0;transform:translateY(8px) scale(.92);transition:.34s;transform-origin:bottom right}
+  .o-bubble.show{opacity:1;transform:translateY(0) scale(1)}
+  .o-bubble::after{content:"";position:absolute;right:16px;bottom:-7px;width:14px;height:14px;
+    background:#dbe8ff;transform:rotate(45deg);border-radius:0 0 4px 0}
+
+  /* 呼吸教练 */
+  .breath{position:absolute;inset:0;z-index:9;display:none;place-items:center;text-align:center;
+    background:radial-gradient(600px 500px at 50% 46%,rgba(10,30,60,.4),rgba(4,8,18,.86))}
+  .breath.on{display:grid}
+  .breath-orb{width:140px;height:140px;border-radius:50%;margin:0 auto 18px;
+    background:radial-gradient(circle at 38% 32%,rgba(160,245,255,.95),rgba(33,170,255,.5) 55%,rgba(120,60,240,.25));
+    box-shadow:0 0 50px rgba(33,230,255,.55);transition:transform 4s ease-in-out,box-shadow 4s}
+  .breath-phase{font-size:24px;font-weight:800;color:#eafcff;letter-spacing:2px}
+  .breath-hint{margin-top:6px;color:var(--ink-dim);font-size:13px}
+  .breath-close{margin-top:22px}
+
+  /* side */
+  .side{flex:0 0 348px;display:flex;flex-direction:column;gap:13px}
+  @media (max-width:980px){.side{flex:1 1 auto}}
+  .card{background:var(--card);border:1px solid var(--card-brd);border-radius:17px;padding:14px 15px;backdrop-filter:blur(12px)}
+  .card h3{margin:0 0 11px;font-size:11.5px;letter-spacing:1.5px;color:var(--ink-dim);text-transform:uppercase;display:flex;align-items:center;gap:8px}
+  .card h3 .em{font-size:15px}
+  .card h3 .tag{margin-left:auto;font-size:10px;letter-spacing:.5px;color:var(--ink-faint);text-transform:none;
+    border:1px solid var(--card-brd);border-radius:6px;padding:1px 6px}
+
+  /* 生命体征 */
+  .vital-hero{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+  .heart{font-size:38px;line-height:1;filter:drop-shadow(0 0 12px var(--red));transform-origin:center}
+  .heart.beat{animation:hb .26s ease}
+  @keyframes hb{30%{transform:scale(1.32)}60%{transform:scale(.94)}}
+  .hr-num{font-size:46px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums;
+    background:linear-gradient(90deg,#fff,#ff9bb6);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hr-unit{font-size:13px;color:var(--ink-dim);margin-left:4px;font-weight:600}
+  .hr-meta{margin-left:auto;text-align:right;font-size:11px;color:var(--ink-dim);line-height:1.5}
+  .hr-meta b{color:var(--accent);font-weight:700}
+  .ecg{width:100%;height:62px;display:block;border-radius:11px;background:
+    linear-gradient(rgba(33,230,255,.05),rgba(33,230,255,0)),repeating-linear-gradient(90deg,rgba(33,230,255,.06) 0 1px,transparent 1px 22px),
+    repeating-linear-gradient(0deg,rgba(33,230,255,.06) 0 1px,transparent 1px 16px),#060c18;
+    border:1px solid rgba(33,230,255,.12)}
+  .acq{margin-top:8px;height:6px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden;display:none}
+  .acq i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--cyan),var(--blue));transition:width .3s}
+  .acq-txt{font-size:11px;color:var(--ink-dim);margin-top:5px;display:none}
+
+  .mini-row{display:flex;gap:9px;margin-top:12px}
+  .mini{flex:1;background:rgba(10,18,36,.5);border:1px solid var(--card-brd);border-radius:12px;padding:9px 10px;min-width:0}
+  .mini .ml{font-size:10.5px;color:var(--ink-dim);letter-spacing:.5px;display:flex;align-items:center;gap:4px}
+  .mini .mv{font-size:21px;font-weight:800;line-height:1.1;margin-top:3px;font-variant-numeric:tabular-nums}
+  .mini .mv small{font-size:11px;color:var(--ink-dim);font-weight:600;margin-left:2px}
+  .mini .mbar{height:5px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:7px}
+  .mini .mbar i{display:block;height:100%;width:50%;border-radius:99px;transition:width .5s,background .5s}
+
+  /* 情绪坐标 */
+  .va-wrap{position:relative;width:100%;aspect-ratio:1/.82}
+  .va{width:100%;height:100%;display:block;border-radius:13px;background:
+    radial-gradient(circle at 50% 50%,rgba(33,230,255,.05),transparent 70%),#070d1c;border:1px solid var(--card-brd)}
+  .va-lab{position:absolute;font-size:10px;color:var(--ink-faint);pointer-events:none;letter-spacing:.5px}
+
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{font-size:12.5px;padding:6px 11px;border-radius:999px;border:1px solid var(--card-brd);
+    background:rgba(255,255,255,.03);color:var(--ink-faint);transition:.18s;user-select:none;display:flex;gap:5px;align-items:center}
+  .chip.on{color:#04121f;font-weight:800;background:linear-gradient(135deg,var(--cyan),#7fe0ff);border-color:transparent;
+    transform:translateY(-1px) scale(1.03);box-shadow:0 6px 16px rgba(33,230,255,.4)}
+
+  /* 手势图鉴 */
+  .gest-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+  .gcell{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 3px;border-radius:11px;
+    border:1px solid var(--card-brd);background:rgba(255,255,255,.03);transition:.25s}
+  .gcell .ge{font-size:22px;filter:grayscale(1) opacity(.4);transition:.3s}
+  .gcell .gl{font-size:10px;color:var(--ink-faint);transition:.3s}
+  .gcell.got{background:linear-gradient(150deg,rgba(33,230,255,.16),rgba(255,61,240,.12));border-color:rgba(33,230,255,.5)}
+  .gcell.got .ge{filter:none}
+  .gcell.got .gl{color:var(--ink)}
+  .gcell.flash{animation:gflash .6s ease}
+  @keyframes gflash{0%{transform:scale(1)}40%{transform:scale(1.22)}100%{transform:scale(1)}}
+
+  /* 中央手势特效 */
+  .gpop{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%) scale(.4);z-index:8;pointer-events:none;
+    display:flex;flex-direction:column;align-items:center;gap:6px;opacity:0;transition:none}
+  .gpop.show{animation:gpop 1.5s cubic-bezier(.2,1.2,.3,1) forwards}
+  .gpop .gpe{font-size:120px;line-height:1;filter:drop-shadow(0 10px 30px rgba(0,0,0,.5))}
+  .gpop .gpl{font-size:21px;font-weight:800;color:#fff;background:rgba(8,14,28,.55);backdrop-filter:blur(8px);
+    border:1px solid var(--card-brd);padding:6px 18px;border-radius:999px}
+  @keyframes gpop{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}
+    18%{opacity:1;transform:translate(-50%,-50%) scale(1.12)}
+    32%{transform:translate(-50%,-50%) scale(1)}
+    78%{opacity:1;transform:translate(-50%,-58%) scale(1)}
+    100%{opacity:0;transform:translate(-50%,-72%) scale(.92)}}
+
+  .energy-top{display:flex;align-items:flex-end;gap:8px;margin-bottom:9px}
+  .energy-val{font-size:32px;font-weight:900;line-height:1;background:linear-gradient(90deg,var(--cyan),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .energy-top small{color:var(--ink-dim);font-size:12px;margin-bottom:3px}
+  .bar{height:11px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden}
+  .bar i{display:block;height:100%;width:50%;border-radius:99px;background:linear-gradient(90deg,#21e6ff,#7a8bff 50%,#ff5db1);transition:width .4s}
+  .streak{margin-top:9px;font-size:12.5px;color:var(--ink-dim)}
+  .streak b{color:var(--accent)}
+
+  .achv{display:flex;flex-direction:column;gap:8px;max-height:150px;overflow:auto}
+  .achv-row{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--ink-dim);opacity:.42;transition:.4s}
+  .achv-row.got{opacity:1;color:var(--ink)}
+  .achv-row .ai{width:29px;height:29px;border-radius:9px;display:grid;place-items:center;font-size:16px;background:rgba(255,255,255,.05);flex:0 0 auto}
+  .achv-row.got .ai{background:linear-gradient(135deg,var(--cyan),var(--magenta))}
+  .achv-row b{display:block;color:inherit;font-weight:700}
+  .achv-row em{font-style:normal;font-size:11px;opacity:.7}
+
+  .quote{font-size:14px;line-height:1.7;color:#dfeaff;min-height:44px}
+
+  .controls{display:flex;flex-wrap:wrap;gap:9px;margin-top:18px;justify-content:center}
+  button{font-family:inherit;cursor:pointer;border:none;font-weight:700;transition:.2s;color:#fff;touch-action:manipulation}
+  .btn{background:rgba(255,255,255,.06);border:1px solid var(--card-brd);padding:11px 17px;border-radius:12px;font-size:13.5px;backdrop-filter:blur(8px)}
+  .btn:hover{background:rgba(255,255,255,.13);transform:translateY(-2px)}
+  .btn.active{background:linear-gradient(135deg,var(--cyan),var(--blue));border-color:transparent;color:#021018}
+
+  .gate{position:absolute;inset:0;z-index:20;display:grid;place-items:center;text-align:center;padding:22px;
+    background:radial-gradient(620px 440px at 50% 30%,rgba(33,120,255,.22),transparent),rgba(4,7,15,.9);backdrop-filter:blur(7px)}
+  .gate.hide{display:none}
+  .gate-inner{max-width:486px}
+  .gate .big{font-size:58px;animation:float 3.4s ease-in-out infinite;filter:drop-shadow(0 0 22px rgba(33,230,255,.5))}
+  .gate h2{margin:12px 0 6px;font-size:23px}
+  .gate p{color:var(--ink-dim);font-size:14px;line-height:1.7;margin:0 0 14px}
+  .feat{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:0 0 18px}
+  .feat span{font-size:11.5px;color:var(--ink-dim);background:rgba(255,255,255,.05);border:1px solid var(--card-brd);border-radius:999px;padding:5px 11px}
+  .cta{font-size:17px;padding:15px 32px;border-radius:15px;background:linear-gradient(135deg,#21e6ff,#3b82f6 55%,#ff3df0);
+    box-shadow:0 14px 38px rgba(33,150,255,.5);color:#06121f}
+  .cta:hover{transform:translateY(-3px) scale(1.02)}
+  .privacy{margin-top:15px;font-size:12px;color:var(--ink-dim);display:flex;align-items:center;justify-content:center;gap:6px}
+  .disc{margin-top:9px;font-size:11px;color:var(--ink-faint);line-height:1.6;max-width:420px;margin-inline:auto}
+  .spinner{width:38px;height:38px;border-radius:50%;border:4px solid rgba(255,255,255,.15);border-top-color:var(--cyan);margin:0 auto 14px;animation:spin .9s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .err{color:#ffd8e6;font-size:13px;line-height:1.7;background:rgba(255,90,140,.1);border:1px solid rgba(255,90,140,.3);border-radius:12px;padding:12px 14px;margin-top:14px;text-align:left}
+
+  .toasts{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+  .toast{background:linear-gradient(135deg,#21e6ff,#3b82f6);color:#04121f;padding:11px 18px;border-radius:13px;font-weight:800;font-size:14px;
+    box-shadow:0 12px 30px rgba(33,150,255,.45);display:flex;align-items:center;gap:9px;animation:toastIn .4s, toastOut .4s 2.7s forwards}
+  .toast .te{font-size:19px}
+  @keyframes toastIn{from{opacity:0;transform:translateY(-16px) scale(.9)}}
+  @keyframes toastOut{to{opacity:0;transform:translateY(-12px) scale(.96)}}
+
+  .foot{text-align:center;color:var(--ink-faint);font-size:11.5px;margin-top:22px;line-height:1.7}
+  .kbd{font-family:ui-monospace,monospace;background:rgba(255,255,255,.08);border:1px solid var(--card-brd);border-radius:6px;padding:1px 6px;font-size:11px}
+
+  @media (max-width:980px){
+    .app{padding-bottom:84px}
+    .title p{display:none}
+    .video-wrap{aspect-ratio:3/4}
+    .mind{max-width:none;left:10px;right:10px}
+    .orb{width:50px;height:50px;bottom:88px}
+    .o-bubble{max-width:56vw;font-size:12px}
+    .controls{position:fixed;left:0;right:0;bottom:0;z-index:40;margin:0;gap:6px;justify-content:stretch;
+      padding:9px 8px calc(9px + env(safe-area-inset-bottom));
+      background:rgba(6,10,22,.82);backdrop-filter:blur(14px);border-top:1px solid var(--card-brd)}
+    .controls .btn{flex:1;min-width:0;padding:12px 3px;font-size:11.5px;border-radius:11px}
+    .foot{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="toasts" id="toasts"></div>
+
+<div class="app">
+  <header>
+    <div class="logo">🧠</div>
+    <div class="title">
+      <h1>灵犀 · AI 读心仪</h1>
+      <p>一束摄像头，读出你的心率·情绪·意图 — 多模态生命体征融合，全程本地不上传</p>
+    </div>
+    <div class="stat-pills">
+      <div class="pill"><span class="dot" id="liveDot"></span><span id="statusTxt">未开启</span></div>
+      <div class="pill">📶 <span id="fpsTxt">--</span> FPS</div>
+    </div>
+  </header>
+
+  <div class="stage">
+    <div class="video-wrap" id="wrap">
+      <video id="cam" playsinline muted></video>
+      <canvas id="mesh"></canvas>
+      <canvas id="fx"></canvas>
+      <div class="pulse-ring" id="pulseRing"></div>
+      <div class="scanline" id="scan"></div>
+
+      <div class="emo-badge" id="badge" style="display:none">
+        <div class="emo-face" id="emoFace">🫥</div>
+        <div>
+          <div class="emo-name"><span id="emoName">准备中</span><small id="emoEn">ready</small></div>
+          <div class="emo-sub" id="emoSub">等待信号…</div>
+          <div class="emo-conf"><i id="emoConf"></i></div>
+        </div>
+      </div>
+      <div class="timeline" id="timeline" style="display:none"></div>
+
+      <div class="mind" id="mind" style="display:none">
+        <div class="mi" id="mindIcon">🔮</div>
+        <div class="mt">
+          <b><span id="mindName">读心中…</span><span id="mindConf"></span></b>
+          <em id="mindEvi">正在采集你的生理与表情信号…</em>
+        </div>
+      </div>
+
+      <div class="gpop" id="gpop"><div class="gpe" id="gpopE">👍</div><div class="gpl" id="gpopL">点赞</div></div>
+
+      <div class="orb" id="orb"></div>
+      <div class="o-bubble" id="oBubble"></div>
+
+      <!-- 呼吸教练 -->
+      <div class="breath" id="breath">
+        <div>
+          <div class="breath-orb" id="breathOrb"></div>
+          <div class="breath-phase" id="breathPhase">准备…</div>
+          <div class="breath-hint">跟着光球，鼻子吸气 · 缓缓呼气</div>
+          <button class="btn breath-close" id="breathClose">完成 ✓</button>
+        </div>
+      </div>
+
+      <div class="gate" id="gate">
+        <div class="gate-inner" id="gateInner">
+          <div class="big">🧠✨</div>
+          <h2>开启灵犀读心仪</h2>
+          <p>对准摄像头，灵犀会从你脸上皮肤的<b>微小血流变化</b>里读出心率，<br>再融合表情、呼吸、眼神和<b>手势</b>，读懂你此刻的情绪与意图 🔮<br><small style="color:var(--ink-faint)">试试对它比个心 🫰、挥挥手 👋、点个赞 👍，灵犀会回应你～</small></p>
+          <div class="feat">
+            <span>❤️ 摄像头测心率 rPPG</span><span>🫁 呼吸 / 血氧估算</span>
+            <span>😌 情绪 × 压力</span><span>🔮 意图读心</span><span>🖐️ 手势互动</span>
+          </div>
+          <button class="cta" id="startBtn">📷 开始读心</button>
+          <div class="privacy">🔒 画面只在你的设备里处理，绝不上传任何服务器</div>
+          <div class="disc">提示：请保持光线充足、面部正对镜头、尽量少动，约 8 秒后心率开始锁定。<br>本应用为娱乐/自我觉察用途，所有生理数值为摄像头估算，<b>非医疗设备</b>。</div>
+          <div class="err" id="errBox" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="card">
+        <h3><span class="em">❤️</span> 生命体征 <span class="tag">摄像头估算</span></h3>
+        <div class="vital-hero">
+          <div class="heart" id="heart">❤️</div>
+          <div><span class="hr-num" id="hrNum">--</span><span class="hr-unit">BPM</span></div>
+          <div class="hr-meta">信号 <b id="hrQual">--</b><br>静息基线 <b id="hrBase">--</b></div>
+        </div>
+        <canvas class="ecg" id="ecg"></canvas>
+        <div class="acq" id="acq"><i id="acqBar"></i></div>
+        <div class="acq-txt" id="acqTxt"></div>
+        <div class="mini-row">
+          <div class="mini"><div class="ml">🫁 呼吸</div><div class="mv"><span id="brNum">--</span><small>/分</small></div><div class="mbar"><i id="brBar" style="background:linear-gradient(90deg,#21e6ff,#9dff3d)"></i></div></div>
+          <div class="mini"><div class="ml">🩸 血氧</div><div class="mv"><span id="spNum">--</span><small>%</small></div><div class="mbar"><i id="spBar" style="background:linear-gradient(90deg,#ff5db1,#ff3df0)"></i></div></div>
+          <div class="mini"><div class="ml">🧘 压力</div><div class="mv"><span id="stNum">--</span></div><div class="mbar"><i id="stBar" style="background:linear-gradient(90deg,#9dff3d,#ffb53d)"></i></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3><span class="em">🧭</span> 情绪坐标 · 效价 × 唤醒</h3>
+        <div class="va-wrap">
+          <canvas class="va" id="va"></canvas>
+          <div class="va-lab" style="left:8px;top:6px">😣 紧张/愤怒</div>
+          <div class="va-lab" style="right:8px;top:6px">🤩 兴奋/开心</div>
+          <div class="va-lab" style="left:8px;bottom:6px">😔 低落/疲惫</div>
+          <div class="va-lab" style="right:8px;bottom:6px">😌 放松/平静</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3><span class="em">👁️</span> 行为捕捉</h3>
+        <div class="chips" id="chips"></div>
+      </div>
+
+      <div class="card">
+        <h3><span class="em">🖐️</span> 手势图鉴 <span class="tag" id="gestCount">0 / 12</span></h3>
+        <div class="gest-grid" id="gestGrid"></div>
+      </div>
+
+      <div class="card">
+        <h3><span class="em">⚡</span> 情绪价值能量</h3>
+        <div class="energy-top"><span class="energy-val" id="energyVal">50</span><small>/ 100</small></div>
+        <div class="bar"><i id="energyBar"></i></div>
+        <div class="streak" id="streakTxt">灵犀在你身边，慢慢来 ✨</div>
+      </div>
+
+      <div class="card">
+        <h3><span class="em">🏆</span> 读心成就</h3>
+        <div class="achv" id="achv"></div>
+      </div>
+
+      <div class="card">
+        <h3><span class="em">💬</span> 灵犀悄悄话</h3>
+        <div class="quote" id="quote">准备好了吗？让灵犀读读你此刻的心 🔮</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls" id="controls" style="display:none">
+    <button class="btn active" id="btnMirror">🔄 镜像</button>
+    <button class="btn" id="btnRoi">🎯 信号区</button>
+    <button class="btn" id="btnCal">🎚️ 校准基线</button>
+    <button class="btn" id="btnBreath">🫁 深呼吸</button>
+    <button class="btn" id="btnShot">📸 读心卡</button>
+    <button class="btn" id="btnStop">⏹️ 停止</button>
+  </div>
+
+  <div class="foot">
+    快捷键：<span class="kbd">M</span> 镜像 · <span class="kbd">R</span> 信号区 · <span class="kbd">B</span> 深呼吸 · <span class="kbd">S</span> 截图　|
+    心率由 rPPG（远程光电容积脉搏波 · POS 算法 + FFT）实时解算 · 表情/眼神由 MediaPipe FaceLandmarker 478 点驱动 · 手势由 GestureRecognizer 识别 · 多模态融合读心
+  </div>
+</div>
+
+<script type="module">
+/* ============================================================
+   灵犀 · AI 读心仪
+   摄像头 → rPPG 心率 + 表情 + 眼神 + 行为 → 多模态融合 → 情绪/意图
+   ============================================================ */
+
+/* ---------------- 文案数据 ---------------- */
+const EMO = {
+  excited:  {zh:"兴奋",   en:"Excited",  emoji:"🤩", color:"#ffb53d"},
+  happy:    {zh:"愉悦",   en:"Happy",    emoji:"😄", color:"#9dff3d"},
+  calm:     {zh:"平静",   en:"Calm",     emoji:"🙂", color:"#21e6ff"},
+  relaxed:  {zh:"放松",   en:"Relaxed",  emoji:"😌", color:"#28e0a0"},
+  surprised:{zh:"惊讶",   en:"Surprised",emoji:"😲", color:"#4dd2ff"},
+  anxious:  {zh:"紧张",   en:"Anxious",  emoji:"😟", color:"#ff8a3d"},
+  angry:    {zh:"生气",   en:"Angry",    emoji:"😠", color:"#ff4d6d"},
+  sad:      {zh:"难过",   en:"Sad",      emoji:"😢", color:"#7aa6ff"},
+  fear:     {zh:"害怕",   en:"Fearful",  emoji:"😨", color:"#c79bff"},
+  disgust:  {zh:"嫌弃",   en:"Disgust",  emoji:"🤢", color:"#8bd450"},
+  tired:    {zh:"疲惫",   en:"Tired",    emoji:"😪", color:"#9aa6c8"},
+};
+// 情绪 → 暖心话（情绪价值）
+const EMSG = {
+  excited:["哇，你的心跳和眼神都亮起来了！这股劲儿真好看 ✨","能量拉满～灵犀也跟着你一起激动 🔥","这种兴奋的感觉，值得好好享受一下 🎉"],
+  happy:  ["你嘴角的弧度，灵犀接收到了，超治愈 😄","好心情 +1，把它存进今天的回忆里吧 🌟","笑起来的你，连信号都变温柔了 💛"],
+  calm:   ["心率平稳、神情松弛，这是很舒服的状态 🌿","平平静静，刚刚好，灵犀陪你待一会儿 ☕","此刻的你很稳，像一片安静的湖面 💧"],
+  relaxed:["呼吸慢下来了，肩膀也松了，真好 😌","这种放松很珍贵，多停留几秒 🍃","灵犀读到满满的松弛感，给你点个赞 👍"],
+  surprised:["咦，发生什么有趣的事了吗？👀","你的瞳孔和心跳都被点亮了一下，好奇心真可爱 ✨","惊喜时刻已记录，灵犀也想知道是什么 🎁"],
+  anxious:["心跳有点快、呼吸也急了些…别急，灵犀在 🫂","深吸一口气，慢慢呼出来，要不要一起？🫁","紧张是身体在认真对待，你已经很棒了 💪"],
+  angry:  ["感觉到你心里的火气了，先松松眉头 🍃","谁惹你啦？把气交给灵犀，你值得平静 🌊","深呼吸三次，火气会比你想的退得快 🧊"],
+  sad:    ["有点低落对吗？灵犀轻轻抱抱你 🫂","难过也没关系，慢慢来，我一直在 🤍","再灰的天，也会慢慢透出光的 🌤️"],
+  fear:   ["别怕，你是安全的，灵犀守在这儿 🛡️","把注意力放回呼吸上，一切都会过去 🌙","害怕很正常，我们一起面对它 🫶"],
+  disgust:["哈哈这个嫌弃脸，灵犀都学会了 😝","不喜欢就皱皱鼻子，你的感受很重要 🙂","遇到不爽的了？让它过去就好 🍃"],
+  tired:  ["眼睛在打架了吧？该歇歇啦 😪","累了就闭眼三秒，灵犀帮你看着世界 🌛","身体在喊累，记得对自己温柔点 🛋️"],
+};
+// 意图（读心）
+const INTENT = {
+  focused:  {zh:"专注投入", en:"Focused",   icon:"🎯", color:"#21e6ff"},
+  thinking: {zh:"若有所思", en:"Thinking",  icon:"🤔", color:"#a78bff"},
+  excited:  {zh:"兴奋期待", en:"Excited",   icon:"🚀", color:"#ffb53d"},
+  engaging: {zh:"想要交流", en:"Engaging",  icon:"👋", color:"#9dff3d"},
+  nervous:  {zh:"有点紧张", en:"Nervous",   icon:"😬", color:"#ff8a3d"},
+  relaxed:  {zh:"放松惬意", en:"Relaxed",   icon:"🍃", color:"#28e0a0"},
+  tired:    {zh:"略显疲惫", en:"Tired",     icon:"💤", color:"#9aa6c8"},
+  distracted:{zh:"有点走神",en:"Distracted",icon:"🌀", color:"#7aa6ff"},
+  skeptical:{zh:"心存疑虑", en:"Skeptical", icon:"🧐", color:"#ff5db1"},
+  surprised:{zh:"意外惊讶", en:"Surprised", icon:"⚡", color:"#4dd2ff"},
+};
+const QUOTES = [
+  "灵犀说：身体比语言更诚实，照顾好它 💗",
+  "心跳是你最忠实的鼓手，听听它的节奏 🥁",
+  "慢一点呼吸，世界也会跟着慢下来 🌬️",
+  "今天的你，值得被温柔地读懂 🤍",
+  "情绪没有好坏，它们只是来送个信 ✉️",
+  "累了就停一停，灵犀替你守着这一刻 🌙",
+  "你专注的样子，本身就很有力量 ⚡",
+  "对自己多一点耐心，你已经做得很好了 🌱",
+];
+const CHIPS = [
+  {id:"smile",label:"微笑",emoji:"🙂"},{id:"laugh",label:"大笑",emoji:"😂"},{id:"talk",label:"说话",emoji:"💬"},
+  {id:"blink",label:"眨眼",emoji:"😉"},{id:"closeEye",label:"闭眼",emoji:"😑"},{id:"yawn",label:"打哈欠",emoji:"🥱"},
+  {id:"brow",label:"挑眉",emoji:"🤨"},{id:"frown",label:"皱眉",emoji:"😤"},{id:"gazeAway",label:"瞟向别处",emoji:"👀"},
+  {id:"leanIn",label:"凑近",emoji:"🔍"},{id:"tilt",label:"歪头",emoji:"🤔"},{id:"nod",label:"点头",emoji:"👍"},{id:"shake",label:"摇头",emoji:"🙅"},
+];
+const ACHV = [
+  {id:"first",  name:"信号已连接", desc:"开启灵犀读心仪",     emoji:"📡"},
+  {id:"lock",   name:"心率锁定",   desc:"首次稳定测得心率",   emoji:"❤️"},
+  {id:"calm",   name:"心如止水",   desc:"压力降到 20 以下",   emoji:"🧘"},
+  {id:"smile",  name:"会心一笑",   desc:"被读到真心的笑容",   emoji:"😊"},
+  {id:"breath", name:"深呼吸大师", desc:"完成一次呼吸练习",   emoji:"🫁"},
+  {id:"focus",  name:"心流时刻",   desc:"保持专注 10 秒",     emoji:"🎯"},
+  {id:"heart",  name:"比心达人",   desc:"对灵犀比个心 🫰",     emoji:"💗"},
+  {id:"gcollect",name:"手势收藏家",desc:"解锁 6 种手势",       emoji:"🎁"},
+  {id:"varied", name:"百味人生",   desc:"被读到 5 种情绪",     emoji:"🎭"},
+  {id:"mind",   name:"被读心了",   desc:"灵犀读出你的意图",   emoji:"🔮"},
+];
+
+// 手势 → 情绪价值反应（含自定义）
+const GEST = {
+  wave:       {zh:"挥手",    emoji:"👋", parts:["👋","✨","💫"], energy:6,
+    msg:["看到你跟灵犀打招呼啦～你好呀 👋😊","嗨！灵犀也朝你挥挥手 ✨","你一挥手，今天的好运就被招过来了 🍀"]},
+  thumbUp:    {zh:"点赞",    emoji:"👍", parts:["👍","⭐","✨"], energy:8,
+    msg:["这个赞收到啦！其实你也超棒 👍✨","被你点赞了，灵犀开心到发光 🌟","好评 +1，把这份肯定也送给你自己 💛"]},
+  victory:    {zh:"比耶",    emoji:"✌️", parts:["✌️","🌟","✨"], energy:6,
+    msg:["耶～灵犀陪你一起比个耶 ✌️📸","这一刻值得定格，咔嚓！📷","你比耶的样子，超有元气 ✨"]},
+  fingerHeart:{zh:"比心",    emoji:"🫰", parts:["💗","💕","🫰","✨"], energy:11,
+    msg:["比心收到 🫰 把这份甜甜的心意原样还给你 💗","哇，被你比心击中了，灵犀融化啦 💖","小小一颗心，装下了大大的温柔 💕"]},
+  iloveyou:   {zh:"我爱你",  emoji:"🤟", parts:["💗","💖","✨"], energy:11,
+    msg:["收到你的爱啦！灵犀也好爱你 🤟💗","I love you too～你值得被好好爱着 💝","这份爱意，灵犀稳稳接住了 🫶"]},
+  openPalm:   {zh:"击掌",    emoji:"🖐️", parts:["🖐️","💥","✨"], energy:5,
+    msg:["来，灵犀跟你击个掌！啪！🖐️✨","High five！合作愉快 🙌","掌心相对，元气传给你 ⚡"]},
+  fist:       {zh:"加油",    emoji:"✊", parts:["✊","🔥","💪"], energy:7,
+    msg:["握紧拳头，我们一起加油！💪🔥","Fighting！灵犀给你充满电 ⚡","这股劲头真好，你一定可以的 ✊"]},
+  ok:         {zh:"OK",      emoji:"👌", parts:["👌","✨","✅"], energy:5,
+    msg:["OK～一切尽在掌握 👌","稳！这个 OK 灵犀收到了 ✅","没问题，放心交给此刻的你 ✨"]},
+  pointUp:    {zh:"灵光一现", emoji:"☝️", parts:["💡","✨","🌟"], energy:5,
+    msg:["有好点子了？灵犀也觉得灵光一闪 💡","就是这个！相信你的直觉 ✨","脑袋上的小灯泡亮啦 💡"]},
+  thumbDown:  {zh:"不太行",  emoji:"👎", parts:["🫤","💭"], energy:-2,
+    msg:["不喜欢就摆摆手，灵犀懂你的感受 🫤","这个 pass～你的标准值得被尊重 🙂","不行就不行，下一个会更好 🍃"]},
+  twoHeart:   {zh:"双手比心", emoji:"🫶", parts:["❤️","💖","💝","✨"], energy:13,
+    msg:["哇，大大的爱心！灵犀整个被你融化了 ❤️🫶","双手比心暴击！甜度爆表 💝","这么大的爱，灵犀要抱抱你 🤗"]},
+  thinking:   {zh:"托腮思考", emoji:"🤔", parts:["💭","✨"], energy:2,
+    msg:["托着腮思考的你，认真得很迷人 🤔","在想什么呢？慢慢想，灵犀等你 💭","这个若有所思的样子，灵犀读到了 🔮"]},
+};
+const GEST_ORDER=["wave","thumbUp","victory","fingerHeart","iloveyou","openPalm","fist","ok","pointUp","thumbDown","twoHeart","thinking"];
+// MediaPipe 内置手势类别 → key
+const GEST_MAP={Thumb_Up:"thumbUp",Thumb_Down:"thumbDown",Victory:"victory",Pointing_Up:"pointUp",Closed_Fist:"fist",Open_Palm:"openPalm",ILoveYou:"iloveyou"};
+
+/* ---------------- DOM ---------------- */
+const $ = s=>document.querySelector(s);
+const video=$("#cam"), mesh=$("#mesh"), fx=$("#fx"), wrap=$("#wrap");
+const meshCtx=mesh.getContext("2d"), fxCtx=fx.getContext("2d");
+const gate=$("#gate"), gateInner=$("#gateInner");
+const badge=$("#badge"), emoFace=$("#emoFace"), emoName=$("#emoName"), emoEn=$("#emoEn"), emoSub=$("#emoSub"), emoConf=$("#emoConf");
+const timelineEl=$("#timeline"), mindEl=$("#mind"), mindIcon=$("#mindIcon"), mindName=$("#mindName"), mindConf=$("#mindConf"), mindEvi=$("#mindEvi");
+const heart=$("#heart"), hrNum=$("#hrNum"), hrQual=$("#hrQual"), hrBase=$("#hrBase");
+const ecg=$("#ecg"), ecgCtx=ecg.getContext("2d");
+const acq=$("#acq"), acqBar=$("#acqBar"), acqTxt=$("#acqTxt");
+const brNum=$("#brNum"), brBar=$("#brBar"), spNum=$("#spNum"), spBar=$("#spBar"), stNum=$("#stNum"), stBar=$("#stBar");
+const va=$("#va"), vaCtx=va.getContext("2d");
+const chipsEl=$("#chips"), achvEl=$("#achv");
+const energyVal=$("#energyVal"), energyBar=$("#energyBar"), streakTxt=$("#streakTxt"), quoteEl=$("#quote");
+const liveDot=$("#liveDot"), statusTxt=$("#statusTxt"), fpsTxt=$("#fpsTxt");
+const pulseRing=$("#pulseRing"), scan=$("#scan"), controls=$("#controls");
+const orb=$("#orb"), oBubble=$("#oBubble");
+const breath=$("#breath"), breathOrb=$("#breathOrb"), breathPhase=$("#breathPhase");
+const gpop=$("#gpop"), gpopE=$("#gpopE"), gpopL=$("#gpopL"), gestGrid=$("#gestGrid"), gestCount=$("#gestCount");
+
+/* ---------------- 状态 ---------------- */
+let vision=null, faceLandmarker=null, drawUtils=null, stream=null;
+let running=false, mirror=true, showRoi=true;
+let lastVideoTime=-1, rafId=0;
+let fpsT=performance.now(), fpsN=0;
+let energy=50, streakCalm=0, emotionsSeen=new Set(), achvGot=new Set();
+let chipState={}, timeline=[], headlineEmo="calm", curIntent="focused";
+let lastBubbleAt=0, lastQuoteAt=0, quoteIdx=-1, lastMindChange=0, lastEvi="";
+let blinkRing=[], lastBlink=false, calmTimer=0, focusTimer=0;
+
+/* ---------------- rPPG 采样缓冲 ---------------- */
+const sampCanvas=document.createElement("canvas"); sampCanvas.width=24; sampCanvas.height=24;
+const sampCtx=sampCanvas.getContext("2d",{willReadFrequently:true});
+const BUF_SEC=14;                 // 缓冲秒数
+let rgbBuf=[];                    // {t,r,g,b,y}  y=鼻尖纵坐标(呼吸)
+let lastSampT=0;
+const FS=30, NP=256;             // 重采样率 / 点数  → 8.53s 窗
+const HR_LO=0.7, HR_HI=3.3;      // 42–198 bpm
+const BR_LO=0.13, BR_HI=0.45;    // 8–27 /min
+let hr=0, hrConf=0, hrBaseVal=0, baseSamples=[], calibrating=true, calStart=0;
+let br=0, spo2=0, stress=50, hrv=0, lastBeatAt=0, beatInterval=0;
+let wave=[];                     // 实时脉搏波形(显示用)
+let waveEMA=0, waveSlow=0, displayLocked=false;
+
+/* ---------------- 手势识别 ---------------- */
+let gestureRecognizer=null, lastGestRun=0, gestTs=0;
+let curGestKey="none", lastFiredKey="none", lastFiredAt=0, gesturesSeen=new Set();
+let wristHist=[];                // {t,x} 用于挥手检测
+let handNearFace=false;          // 托腮 → 助推"若有所思"
+
+/* ---------------- 多模态特征(平滑) ---------------- */
+const F={};   // 平滑后的特征
+const Fraw={};
+function ema(key,val,a){ F[key]=F[key]===undefined?val:F[key]*(1-a)+val*a; return F[key]; }
+
+/* ============================================================
+   构建 UI
+   ============================================================ */
+CHIPS.forEach(c=>{ const e=document.createElement("div"); e.className="chip"; e.id="chip-"+c.id;
+  e.innerHTML=`<span>${c.emoji}</span>${c.label}`; chipsEl.appendChild(e); });
+ACHV.forEach(a=>{ const e=document.createElement("div"); e.className="achv-row"; e.id="achv-"+a.id;
+  e.innerHTML=`<div class="ai">${a.emoji}</div><div><b>${a.name}</b><em>${a.desc}</em></div>`; achvEl.appendChild(e); });
+GEST_ORDER.forEach(k=>{ const G=GEST[k]; const e=document.createElement("div"); e.className="gcell"; e.id="gcell-"+k;
+  e.innerHTML=`<div class="ge">${G.emoji}</div><div class="gl">${G.zh}</div>`; gestGrid.appendChild(e); });
+gestCount.textContent=`0 / ${GEST_ORDER.length}`;
+rotateQuote();
+
+/* ============================================================
+   启动
+   ============================================================ */
+async function start(){
+  gateInner.innerHTML=`<div class="spinner"></div><h2>灵犀正在连接…</h2>
+    <p>首次需要下载一点点模型（约几秒）<br>请允许使用摄像头 📷</p>`;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:{ideal:1280},height:{ideal:720}},audio:false});
+    video.srcObject=stream; await video.play();
+  }catch(e){ return fail("摄像头打不开 😢", e, true); }
+  try{
+    vision=await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/vision_bundle.mjs");
+    const fileset=await vision.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm");
+    faceLandmarker=await createLM(fileset,"GPU").catch(()=>createLM(fileset,"CPU"));
+    drawUtils=new vision.DrawingUtils(meshCtx);
+    // 手势识别（可选，失败则仅保留表情/生理）
+    try{ gestureRecognizer=await createGR(fileset,"GPU").catch(()=>createGR(fileset,"CPU")); }
+    catch(ge){ console.warn("手势模型加载失败，已跳过", ge); gestureRecognizer=null; }
+  }catch(e){ return fail("模型加载失败 😢", e, false); }
+
+  sizeCanvases();
+  gate.classList.add("hide");
+  badge.style.display=""; timelineEl.style.display=""; mindEl.style.display=""; controls.style.display="";
+  orb.style.display=""; scan.classList.add("on");
+  liveDot.classList.add("live"); statusTxt.textContent="读心中";
+  acq.style.display=""; acqTxt.style.display="";
+  running=true; calibrating=true; calStart=performance.now(); baseSamples=[];
+  unlock("first"); showBubble("灵犀已连接～放轻松，对准镜头，先让我读读你的心跳 ❤️");
+  lastVideoTime=-1; loop();
+}
+function createLM(fileset,delegate){
+  return vision.FaceLandmarker.createFromOptions(fileset,{
+    baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",delegate},
+    outputFaceBlendshapes:true, outputFacialTransformationMatrixes:true, runningMode:"VIDEO", numFaces:1});
+}
+function createGR(fileset,delegate){
+  return vision.GestureRecognizer.createFromOptions(fileset,{
+    baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task",delegate},
+    runningMode:"VIDEO", numHands:2});
+}
+function fail(title,e,isCam){
+  console.error(e);
+  gateInner.innerHTML=`<div class="big">😵‍💫</div><h2>${title}</h2>`;
+  const tips=isCam
+    ? `· 点击地址栏的摄像头图标，把权限改为「允许」<br>· 确认没有别的程序正在占用摄像头<br>· <b>手机要用 HTTPS 网址打开</b>（http 会禁用摄像头）<br>· 电脑双击本地文件若不行，请用本地服务器打开`
+    : `· 检查网络（首次需从 CDN 下载模型）<br>· 关闭代理 / VPN 后重试<br>· 刷新页面再试一次`;
+  const div=document.createElement("div"); div.className="err";
+  div.innerHTML=tips+`<br><br><b style="color:#fff">${(e&&e.message)||e}</b>`;
+  const btn=document.createElement("button"); btn.className="cta"; btn.style.marginTop="16px"; btn.textContent="🔁 重试"; btn.onclick=start;
+  gateInner.appendChild(div); gateInner.appendChild(btn);
+}
+
+/* ============================================================
+   主循环
+   ============================================================ */
+function loop(){
+  if(!running) return;
+  rafId=requestAnimationFrame(loop);
+  const nowp=performance.now();
+  fpsN++; if(nowp-fpsT>500){ fpsTxt.textContent=Math.round(fpsN*1000/(nowp-fpsT)); fpsT=nowp; fpsN=0; }
+  beatTick(nowp);                 // 心跳脉动(按测得心率)
+
+  if(video.currentTime===lastVideoTime){ drawFx(); drawEcg(); return; }
+  lastVideoTime=video.currentTime;
+
+  let res; try{ res=faceLandmarker.detectForVideo(video,nowp); }catch(e){ drawFx(); return; }
+  const has=res.faceLandmarks&&res.faceLandmarks.length>0;
+  meshCtx.clearRect(0,0,mesh.width,mesh.height);
+
+  if(has){
+    const lms=res.faceLandmarks[0];
+    const cat=(res.faceBlendshapes&&res.faceBlendshapes[0])?res.faceBlendshapes[0].categories:[];
+    const bs={}; cat.forEach(c=>bs[c.categoryName]=c.score); const g=n=>bs[n]||0;
+    const pose=(res.facialTransformationMatrixes&&res.facialTransformationMatrixes[0])?headPose(res.facialTransformationMatrixes[0].data):{yaw:0,pitch:0,roll:0};
+
+    sampleRPPG(lms, nowp);        // 采集皮肤 RGB
+    computeVitals(nowp);          // 心率/呼吸/血氧/压力
+    extractFeatures(g, lms, pose, nowp); // 表情/眼神/行为特征
+    const emo=fuseEmotion();      // 情绪融合
+    updateEmotion(emo, nowp);
+    const intent=fuseIntent();    // 意图读心
+    updateIntent(intent, nowp);
+    detectBehaviors(g, pose, lms, nowp);
+    updateEnergy(emo, nowp);
+    drawOverlay(lms, pose);       // ROI / 眼神 / 轮廓
+    drawVA(emo);
+    statusTxt.textContent = calibrating ? "校准基线中…" : "读到你啦 ✓";
+  }else{
+    statusTxt.textContent="把脸对准镜头～"; hrConf*=0.97;
+  }
+  runGestures(nowp, has?res.faceLandmarks[0]:null);
+  drawHands(lastHands);
+  drawFx(); drawEcg();
+}
+
+/* ============================================================
+   rPPG — 皮肤 RGB 采样
+   ============================================================ */
+function px(lm,i){ return {x:lm[i].x, y:lm[i].y}; }
+function sampleRPPG(lm, nowp){
+  const W=video.videoWidth, H=video.videoHeight;
+  if(!W||!H) return;
+  // 人脸尺度
+  const faceW=Math.abs(lm[234].x-lm[454].x)*W;
+  const faceH=Math.abs(lm[10].y-lm[152].y)*H;
+  // 额头中心(发际线与眉间中点) + 双颊
+  const fc={x:(lm[10].x+lm[9].x)/2*W, y:(lm[10].y+lm[9].y)/2*H};
+  const lc={x:lm[117].x*W, y:lm[117].y*H};
+  const rc={x:lm[346].x*W, y:lm[346].y*H};
+  const rois=[
+    {x:fc.x,y:fc.y,w:faceW*0.30,h:faceH*0.16,wt:0.5},
+    {x:lc.x,y:lc.y,w:faceW*0.16,h:faceH*0.13,wt:0.25},
+    {x:rc.x,y:rc.y,w:faceW*0.16,h:faceH*0.13,wt:0.25},
+  ];
+  let R=0,G=0,B=0,WT=0;
+  for(const roi of rois){
+    const sx=Math.max(0,roi.x-roi.w/2), sy=Math.max(0,roi.y-roi.h/2);
+    const sw=Math.min(W-sx,roi.w), sh=Math.min(H-sy,roi.h);
+    if(sw<4||sh<4) continue;
+    sampCtx.drawImage(video,sx,sy,sw,sh,0,0,24,24);
+    let d; try{ d=sampCtx.getImageData(0,0,24,24).data; }catch(e){ return; }
+    let r=0,gg=0,b=0,n=0;
+    for(let i=0;i<d.length;i+=4){
+      const cr=d[i],cg=d[i+1],cb=d[i+2];
+      // 轻量肤色过滤：剔除过暗/非肤色像素(头发、眉毛、阴影)
+      if(cr<45||cr<cb*0.9||cg<25) continue;
+      r+=cr; gg+=cg; b+=cb; n++;
+    }
+    if(n<20) continue;
+    R+=(r/n)*roi.wt; G+=(gg/n)*roi.wt; B+=(b/n)*roi.wt; WT+=roi.wt;
+  }
+  if(WT<0.4) return;
+  R/=WT; G/=WT; B/=WT;
+  const t=nowp/1000;
+  const noseY=lm[1].y;
+  rgbBuf.push({t,r:R,g:G,b:B,y:noseY});
+  while(rgbBuf.length && t-rgbBuf[0].t>BUF_SEC) rgbBuf.shift();
+
+  // 实时脉搏波形(显示用)：绿通道去趋势
+  waveSlow = waveSlow ? waveSlow*0.94+G*0.06 : G;
+  let ac = G - waveSlow;
+  waveEMA = waveEMA*0.6 + ac*0.4;
+  wave.push(waveEMA);
+  if(wave.length>180) wave.shift();
+}
+
+/* ============================================================
+   rPPG — POS 算法 + FFT 解算心率/呼吸/血氧/压力
+   ============================================================ */
+let lastVitalsT=0;
+function computeVitals(nowp){
+  const span = rgbBuf.length>1 ? rgbBuf[rgbBuf.length-1].t-rgbBuf[0].t : 0;
+  // 采集进度
+  const need=8.6;
+  if(span<need){
+    const pct=Math.min(99,span/need*100);
+    acqBar.style.width=pct+"%"; acqTxt.textContent=`正在采集脉搏信号… ${Math.round(pct)}%（请保持稳定）`;
+    return;
+  }
+  acq.style.display="none"; acqTxt.style.display="none";
+  if(nowp-lastVitalsT<450) return;   // 每 ~0.45s 解算一次
+  lastVitalsT=nowp;
+
+  // —— 重采样到均匀网格 ——
+  const tEnd=rgbBuf[rgbBuf.length-1].t, tStart=tEnd-(NP-1)/FS;
+  const r=new Float64Array(NP), gch=new Float64Array(NP), b=new Float64Array(NP), yb=new Float64Array(NP);
+  let j=0;
+  for(let i=0;i<NP;i++){
+    const ti=tStart+i/FS;
+    while(j<rgbBuf.length-1 && rgbBuf[j+1].t<ti) j++;
+    const a=rgbBuf[Math.min(j,rgbBuf.length-1)], c=rgbBuf[Math.min(j+1,rgbBuf.length-1)];
+    const dt=(c.t-a.t)||1e-6, f=Math.max(0,Math.min(1,(ti-a.t)/dt));
+    r[i]=a.r+(c.r-a.r)*f; gch[i]=a.g+(c.g-a.g)*f; b[i]=a.b+(c.b-a.b)*f; yb[i]=a.y+(c.y-a.y)*f;
+  }
+  // —— POS：平面正交于肤色 ——
+  const mr=mean(r),mg=mean(gch),mb=mean(b);
+  const S1=new Float64Array(NP),S2=new Float64Array(NP);
+  for(let i=0;i<NP;i++){
+    const Rn=r[i]/mr-1, Gn=gch[i]/mg-1, Bn=b[i]/mb-1;
+    S1[i]=Gn-Bn; S2[i]=Gn+Bn-2*Rn;
+  }
+  const a1=std(S1), a2=std(S2)||1e-6, al=a1/a2;
+  const pulse=new Float64Array(NP);
+  for(let i=0;i<NP;i++) pulse[i]=S1[i]+al*S2[i];
+  detrend(pulse);
+  // —— Hann 窗 + 补零 FFT ——
+  const hr_res=spectrumPeak(pulse, FS, HR_LO, HR_HI);
+  // —— 呼吸：鼻尖纵向位移低频 ——
+  detrend(yb);
+  const br_res=spectrumPeak(yb, FS, BR_LO, BR_HI);
+
+  // —— 心率平滑 + 置信 ——
+  hrConf = hrConf*0.5 + hr_res.snr*0.5;
+  if(hr_res.snr>0.32 && hr_res.bpm>40 && hr_res.bpm<200){
+    const target=hr_res.bpm;
+    if(hr===0) hr=target;
+    else { const d=target-hr; hr += Math.abs(d)>18 ? Math.sign(d)*3 : d*0.25; }
+    if(!displayLocked){ displayLocked=true; unlock("lock"); showBubble(`读到啦！你现在的心率大约 <b>${Math.round(hr)}</b> 次/分 ❤️`); }
+    // 基线校准
+    if(calibrating){
+      baseSamples.push(hr);
+      if(nowp-calStart>9000 && baseSamples.length>6){
+        hrBaseVal=median(baseSamples); calibrating=false;
+        hrBase.textContent=Math.round(hrBaseVal); statusTxt.textContent="读到你啦 ✓";
+        showBubble("基线校准好了～现在我能读出你情绪带来的细微变化了 🔮");
+      }
+    }
+  }
+  // 呼吸
+  if(br_res.snr>0.28 && br_res.bpm>6 && br_res.bpm<30){
+    br = br? br*0.7+br_res.bpm*0.3 : br_res.bpm;
+  }
+  // —— 血氧估算（红/蓝 AC/DC 比，估算值）——
+  const acR=std(r), acB=std(b), ratio=(acR/mr)/((acB/mb)||1e-6);
+  let sp=104 - 18*ratio;
+  sp=Math.max(94,Math.min(99,sp));
+  spo2 = spo2? spo2*0.9+sp*0.1 : sp;
+  // —— HRV / 压力 ——
+  const beats=findBeats(pulse, FS);
+  if(beats.length>=4){
+    const ibis=[]; for(let k=1;k<beats.length;k++) ibis.push((beats[k]-beats[k-1])/FS*1000);
+    hrv = std(ibis);
+  }
+  // 压力：心率高于基线 + HRV 低 + 面部紧张 + 呼吸快
+  const hrNormStress = hrBaseVal? clamp((hr-hrBaseVal)/14,0,1):0;
+  const hrvStress = hrv? clamp((55-hrv)/45,0,1):0.4;
+  const faceTension = clamp((F.browDown||0)*0.9+(F.press||0)*0.7+(F.squint||0)*0.4,0,1);
+  const brStress = br? clamp((br-15)/9,0,1):0;
+  let st=(hrNormStress*0.32+hrvStress*0.26+faceTension*0.27+brStress*0.15)*100;
+  st=clamp(st,2,98);
+  stress = stress*0.85 + st*0.15;
+
+  renderVitals();
+}
+function renderVitals(){
+  hrNum.textContent = hr? Math.round(hr): "--";
+  hrQual.textContent = hrConf>0.55?"优":hrConf>0.38?"良":hrConf>0.2?"弱":"--";
+  hrQual.style.color = hrConf>0.55?"var(--good)":hrConf>0.38?"var(--cyan)":"var(--amber)";
+  if(!calibrating && hrBaseVal) hrBase.textContent=Math.round(hrBaseVal);
+  brNum.textContent = br? Math.round(br):"--"; brBar.style.width=clamp((br-6)/18*100,5,100)+"%";
+  spNum.textContent = spo2? spo2.toFixed(0):"--"; spBar.style.width=clamp((spo2-92)/7*100,5,100)+"%";
+  stNum.textContent = Math.round(stress);
+  stNum.style.color = stress<35?"var(--good)":stress<65?"var(--amber)":"var(--red)";
+  stBar.style.width=stress+"%";
+  stBar.style.background = stress<35?"linear-gradient(90deg,#28e0a0,#9dff3d)":stress<65?"linear-gradient(90deg,#9dff3d,#ffb53d)":"linear-gradient(90deg,#ffb53d,#ff4d6d)";
+  if(stress<20) unlock("calm");
+}
+
+/* ---- 频谱峰值(Hann窗 + 1024补零FFT + 抛物线插值) ---- */
+function spectrumPeak(sig, fs, lo, hi){
+  const N=sig.length, NF=1024;
+  const re=new Float64Array(NF), im=new Float64Array(NF);
+  for(let i=0;i<N;i++){ const w=0.5-0.5*Math.cos(2*Math.PI*i/(N-1)); re[i]=sig[i]*w; }
+  fft(re,im);
+  const df=fs/NF; const loB=Math.max(1,Math.floor(lo/df)), hiB=Math.min(NF/2-1,Math.ceil(hi/df));
+  let peak=loB, peakP=-1, total=0;
+  const P=new Float64Array(NF/2);
+  for(let k=1;k<NF/2;k++){ P[k]=re[k]*re[k]+im[k]*im[k]; }
+  for(let k=loB;k<=hiB;k++){ total+=P[k]; if(P[k]>peakP){ peakP=P[k]; peak=k; } }
+  // 抛物线插值
+  let kk=peak;
+  if(peak>loB&&peak<hiB){ const a=P[peak-1],b=P[peak],c=P[peak+1]; const d=(a-c)/(2*(a-2*b+c)||1e-9); kk=peak+clamp(d,-1,1); }
+  const freq=kk*df, bpm=freq*60;
+  // SNR：峰附近能量 / 频带总能量
+  let near=0; for(let k=Math.max(loB,peak-2);k<=Math.min(hiB,peak+2);k++) near+=P[k];
+  const snr= total>0? near/total : 0;
+  return {bpm,freq,snr};
+}
+/* ---- 简易峰检测(求 IBI) ---- */
+function findBeats(sig, fs){
+  const N=sig.length, beats=[]; const thr=std(sig)*0.5; const refr=Math.floor(fs*0.4);
+  let last=-refr;
+  for(let i=1;i<N-1;i++){
+    if(sig[i]>thr && sig[i]>sig[i-1] && sig[i]>=sig[i+1] && i-last>refr){ beats.push(i); last=i; }
+  }
+  return beats;
+}
+/* ---- 迭代 radix-2 FFT ---- */
+function fft(re,im){
+  const N=re.length;
+  for(let i=1,j=0;i<N;i++){ let bit=N>>1; for(;j&bit;bit>>=1) j^=bit; j^=bit;
+    if(i<j){ const tr=re[i];re[i]=re[j];re[j]=tr; const ti=im[i];im[i]=im[j];im[j]=ti; } }
+  for(let len=2;len<=N;len<<=1){
+    const ang=-2*Math.PI/len, wr=Math.cos(ang), wi=Math.sin(ang);
+    for(let i=0;i<N;i+=len){ let cwr=1,cwi=0;
+      for(let k=0;k<len/2;k++){
+        const a=i+k, bIdx=i+k+len/2;
+        const vr=re[bIdx]*cwr-im[bIdx]*cwi, vi=re[bIdx]*cwi+im[bIdx]*cwr;
+        re[bIdx]=re[a]-vr; im[bIdx]=im[a]-vi; re[a]+=vr; im[a]+=vi;
+        const nwr=cwr*wr-cwi*wi; cwi=cwr*wi+cwi*wr; cwr=nwr;
+      } }
+  }
+}
+function mean(a){ let s=0; for(let i=0;i<a.length;i++) s+=a[i]; return s/a.length; }
+function std(a){ const m=mean(a); let s=0; for(let i=0;i<a.length;i++){ const d=a[i]-m; s+=d*d; } return Math.sqrt(s/a.length); }
+function detrend(a){ // 去线性趋势 + 去均值
+  const N=a.length; let sx=0,sy=0,sxx=0,sxy=0;
+  for(let i=0;i<N;i++){ sx+=i; sy+=a[i]; sxx+=i*i; sxy+=i*a[i]; }
+  const den=(N*sxx-sx*sx)||1e-9, slope=(N*sxy-sx*sy)/den, icpt=(sy-slope*sx)/N;
+  for(let i=0;i<N;i++) a[i]-=slope*i+icpt;
+}
+function median(a){ const b=[...a].sort((x,y)=>x-y); return b[b.length>>1]; }
+function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+
+/* ============================================================
+   表情 / 眼神 / 行为 特征提取
+   ============================================================ */
+let prevLm=null, prevFaceW=0;
+function extractFeatures(g, lm, pose, nowp){
+  const avg=(a,b)=>(g(a)+g(b))/2;
+  const a=0.4;
+  ema("smile", avg("mouthSmileLeft","mouthSmileRight"), a);
+  ema("frown", avg("mouthFrownLeft","mouthFrownRight"), a);
+  ema("browDown", avg("browDownLeft","browDownRight"), a);
+  ema("browInner", g("browInnerUp"), a);
+  ema("browOuter", avg("browOuterUpLeft","browOuterUpRight"), a);
+  ema("eyeWide", avg("eyeWideLeft","eyeWideRight"), a);
+  ema("jaw", g("jawOpen"), a);
+  ema("sneer", avg("noseSneerLeft","noseSneerRight"), a);
+  ema("press", avg("mouthPressLeft","mouthPressRight"), a);
+  ema("pucker", g("mouthPucker"), a);
+  ema("puff", g("cheekPuff"), a);
+  ema("squint", avg("eyeSquintLeft","eyeSquintRight"), a);
+  ema("upperUp", avg("mouthUpperUpLeft","mouthUpperUpRight"), a);
+  const blink=avg("eyeBlinkLeft","eyeBlinkRight");
+  ema("blink", blink, 0.5);
+  ema("cheekSq", avg("cheekSquintLeft","cheekSquintRight"), a);
+
+  // 头部姿态
+  ema("yaw", pose.yaw, 0.3); ema("pitch", pose.pitch, 0.3); ema("roll", pose.roll, 0.3);
+
+  // 眼神方向(虹膜中心 vs 眼角) — 478 点含虹膜
+  let gx=0.5, gy=0.5;
+  if(lm.length>=478){
+    const lo=lm[33], li=lm[133], lcI=lm[468]; // 左眼外/内/虹膜
+    const ro=lm[263], ri=lm[362], rcI=lm[473];
+    const gxL=(lcI.x-li.x)/((lo.x-li.x)||1e-6), gxR=(rcI.x-ri.x)/((ro.x-ri.x)||1e-6);
+    gx=(gxL+gxR)/2;
+    const lTop=lm[159], lBot=lm[145], rTop=lm[386], rBot=lm[374];
+    const gyL=(lcI.y-lTop.y)/((lBot.y-lTop.y)||1e-6), gyR=(rcI.y-rTop.y)/((rBot.y-rTop.y)||1e-6);
+    gy=(gyL+gyR)/2;
+  }
+  ema("gazeX", gx, 0.35); ema("gazeY", gy, 0.35);
+  Fraw.gazeAway = Math.abs(F.gazeX-0.5)>0.22 || Math.abs(F.yaw)>20;
+  Fraw.gazeUp = F.gazeY<0.32;
+
+  // 运动能量 & 脸部尺度(凑近)
+  const faceW=Math.abs(lm[234].x-lm[454].x);
+  let motion=0;
+  if(prevLm){ for(const i of [1,33,263,61,291,10]){ motion+=Math.hypot(lm[i].x-prevLm[i].x,lm[i].y-prevLm[i].y); } motion/=6; }
+  ema("motion", motion/ (faceW||1), 0.3);
+  if(prevFaceW){ ema("leanV", (faceW-prevFaceW)/ (faceW||1), 0.2); }
+  ema("faceW", faceW, 0.1);
+  prevLm=lm.map(p=>({x:p.x,y:p.y})); prevFaceW=faceW;
+
+  // 眨眼频率(每分钟)
+  const isBlink=blink>0.5;
+  if(isBlink&&!lastBlink){ blinkRing.push(nowp); }
+  lastBlink=isBlink;
+  while(blinkRing.length && nowp-blinkRing[0]>30000) blinkRing.shift();
+  F.blinkRate = blinkRing.length*2; // 30s→/min
+
+  // 唤醒度 / 效价
+  const hrNorm = hrBaseVal&&hr? clamp((hr-hrBaseVal)/16,-1,1):0;
+  F.arousal = clamp(0.40*((hrNorm+1)/2)+0.18*F.eyeWide+0.14*F.jaw+0.13*clamp((br-13)/8,0,1)+0.15*clamp(F.motion*10,0,1),0,1);
+  F.valence = clamp(0.5+0.6*(F.smile)-0.55*F.frown-0.5*F.browDown-0.35*F.sneer-0.3*(stress/100-0.4),0,1);
+}
+
+/* ============================================================
+   情绪融合
+   ============================================================ */
+function fuseEmotion(){
+  // 表情先验(离散)
+  const cand={
+    happy:    F.smile*1.2 + F.cheekSq*0.4,
+    surprised:Math.max(0, F.jaw*0.8+F.eyeWide*0.8+F.browOuter*0.55 - F.smile*0.4),
+    sad:      Math.max(0, F.frown*1.05+F.browInner*0.7 - F.smile*0.6),
+    angry:    Math.max(0, F.browDown*1.05+F.press*0.4+F.sneer*0.2 - F.smile*0.5),
+    fear:     Math.max(0, F.eyeWide*0.55+F.browInner*0.55+(F.press)*0.3 - F.smile*0.3),
+    disgust:  Math.max(0, F.sneer*1.05+F.upperUp*0.45 - F.smile*0.3),
+    neutral:  0.22,
+  };
+  let topE="neutral", topV=cand.neutral;
+  for(const k in cand) if(cand[k]>topV){ topV=cand[k]; topE=k; }
+
+  // 生理细化 → 最终情绪键
+  const A=F.arousal, st=stress;
+  let key="calm";
+  if(topE==="happy")          key = A>0.55 ? "excited" : "happy";
+  else if(topE==="surprised") key = "surprised";
+  else if(topE==="sad")       key = "sad";
+  else if(topE==="angry")     key = "angry";
+  else if(topE==="fear")      key = (st>55||A>0.6)?"anxious":"fear";
+  else if(topE==="disgust")   key = "disgust";
+  else { // 中性脸 → 用生理读出隐藏状态(灵犀的关键能力)
+    if(st>62 || (A>0.6 && st>48))            key="anxious";
+    else if(F.blinkRate>26 || F.blink>0.6 || (A<0.3 && F.gazeY>0.62)) key="tired";
+    else if(A<0.34 && st<38)                 key="relaxed";
+    else                                     key="calm";
+  }
+  // 置信：表情显著度 + 信号质量
+  const margin = topV/(topV+0.5);
+  const conf = clamp(0.35 + margin*0.4 + hrConf*0.25, 0.2, 0.98);
+  return {key, conf, V:F.valence, A:F.arousal};
+}
+function updateEmotion(emo, now){
+  if(emo.key!==headlineEmo){
+    headlineEmo=emo.key; const E=EMO[emo.key];
+    emoFace.textContent=E.emoji; emoFace.style.animation="none"; void emoFace.offsetWidth; emoFace.style.animation="pop .4s";
+    emoName.textContent=E.zh; emoEn.textContent=E.en;
+    document.documentElement.style.setProperty("--accent",E.color);
+    emotionsSeen.add(emo.key); if(emotionsSeen.size>=5) unlock("varied");
+    if(emo.key==="happy"||emo.key==="excited") unlock("smile");
+    pushTimeline(E.emoji);
+    if(now-lastBubbleAt>4200) showBubble(rand(EMSG[emo.key]||["灵犀读到你啦 ✨"]), now);
+    spawnBurst(emo.key);
+  }
+  emoSub.textContent = `效价 ${(emo.V*100|0)} · 唤醒 ${(emo.A*100|0)}`;
+  emoConf.style.width=Math.round(emo.conf*100)+"%";
+  emoConf.style.background=`linear-gradient(90deg,${EMO[emo.key].color},#fff)`;
+  if(now-lastQuoteAt>7600){ rotateQuote(); lastQuoteAt=now; }
+  // 高压力时主动安抚
+  if(stress>72 && now-lastBubbleAt>9000 && !breath.classList.contains("on")){
+    showBubble("心跳和呼吸都有点急…要不要点「🫁 深呼吸」，灵犀陪你 30 秒？", now);
+  }
+}
+
+/* ============================================================
+   意图读心
+   ============================================================ */
+function fuseIntent(){
+  const gazeCenter = 1-clamp(Math.abs(F.gazeX-0.5)/0.3,0,1);
+  const stN=stress/100, hrN= hrBaseVal&&hr? clamp((hr-hrBaseVal)/16,-1,1):0;
+  const sc={
+    focused:   gazeCenter*1.1 + (1-clamp(F.motion*9,0,1))*0.6 + (1-clamp(F.blinkRate/28,0,1))*0.3 + (1-stN)*0.2 - F.jaw*0.4,
+    thinking:  (F.gazeUp?0.9:0) + clamp(Math.abs(F.gazeX-0.5)/0.3,0,1)*0.5 + (F.browDown*0.4) + (1-clamp(F.blinkRate/22,0,1))*0.3 - F.smile*0.3 + (handNearFace?1.1:0),
+    excited:   clamp((hrN+1)/2,0,1)*0.7 + F.smile*0.6 + F.browOuter*0.45 + F.eyeWide*0.35 + clamp(F.leanV*30,0,1)*0.4,
+    engaging:  F.smile*0.6 + F.browOuter*0.55 + gazeCenter*0.5 + clamp(F.leanV*30,0,1)*0.3,
+    nervous:   stN*1.1 + clamp(hrN,0,1)*0.6 + F.press*0.5 + clamp((br-15)/8,0,1)*0.4 - F.smile*0.3,
+    relaxed:   (1-stN)*0.8 + (1-clamp((hrN+1)/2,0,1))*0.5 + F.smile*0.25 + (F.arousal<0.35?0.4:0),
+    tired:     clamp(F.blinkRate/30,0,1)*0.7 + F.blink*0.6 + (F.jaw>0.4&&F.blink>0.3?0.8:0) + (1-clamp((hrN+1)/2,0,1))*0.2,
+    distracted:(Fraw.gazeAway?0.9:0) + clamp(Math.abs(F.yaw)/30,0,1)*0.5 + (F.arousal<0.3?0.3:0),
+    skeptical: F.squint*0.8 + Math.abs(F.roll)/30*0.5 + F.press*0.3 + (F.browDown*0.4) - F.smile*0.4,
+    surprised: F.eyeWide*1.0 + F.jaw*0.6 + F.browOuter*0.5,
+  };
+  let top="focused", tv=-9;
+  for(const k in sc) if(sc[k]>tv){ tv=sc[k]; top=k; }
+  return {key:top, score:tv};
+}
+function buildEvidence(key){
+  const ev=[];
+  const hrN = hrBaseVal&&hr? (hr-hrBaseVal):0;
+  if(hrN>6) ev.push(`心率↑${Math.round(hrN)}`); else if(hrN<-5) ev.push(`心率平缓`);
+  if(br && br>19) ev.push("呼吸偏快"); else if(br && br<12) ev.push("呼吸平稳");
+  if(stress>62) ev.push("压力偏高"); else if(stress<30) ev.push("身心放松");
+  if(F.smile>0.4) ev.push("嘴角上扬");
+  if(F.browDown>0.4) ev.push("眉头微皱");
+  if(F.eyeWide>0.4) ev.push("双眼睁大");
+  if(Fraw.gazeAway) ev.push("目光游移"); else ev.push("注视镜头");
+  if(F.gazeUp) ev.push("眼神上飘");
+  if(F.blinkRate>26) ev.push("频繁眨眼");
+  if(F.press>0.4) ev.push("抿嘴");
+  // 取最相关的 3 条
+  return ev.slice(0,3).join(" · ");
+}
+function updateIntent(intent, now){
+  const I=INTENT[intent.key];
+  const changed = intent.key!==curIntent && now-lastMindChange>1400 && intent.score>0.6;
+  if(changed || (intent.key===curIntent && now-lastMindChange>2600)){
+    curIntent=intent.key; lastMindChange=now;
+    mindIcon.textContent=I.icon; mindName.textContent=I.zh;
+    mindName.parentElement.parentElement.previousElementSibling; // noop
+    const conf=clamp(intent.score/2.2,0.3,0.97);
+    mindConf.textContent="读心 "+Math.round(conf*100)+"%";
+    mindConf.style.color=I.color;
+    const evi=buildEvidence(intent.key);
+    lastEvi=evi; mindEvi.textContent="读心依据：" + (evi||"综合表情与生理信号");
+    if(changed){ unlock("mind"); }
+    if(intent.key==="focused"){ focusTimer+=0; }
+  }
+}
+
+/* ============================================================
+   行为检测 chips
+   ============================================================ */
+let nodBuf=[], shakeBuf=[];
+function setChip(id,on){ if(chipState[id]===on) return; chipState[id]=on; const el=document.getElementById("chip-"+id); if(el) el.classList.toggle("on",on); }
+function detectBehaviors(g, pose, lm, now){
+  const avg=(a,b)=>(g(a)+g(b))/2;
+  const smile=avg("mouthSmileLeft","mouthSmileRight"), jaw=g("jawOpen");
+  setChip("smile",smile>0.3); setChip("laugh",smile>0.55&&jaw>0.18);
+  setChip("talk",jaw>0.12&&jaw<0.5&&smile<0.5&&F.motion>0.004);
+  setChip("blink",F.blink>0.5); setChip("closeEye",F.blink>0.62&&jaw<0.2);
+  setChip("yawn",jaw>0.55&&F.blink>0.3);
+  setChip("brow",F.browOuter>0.42||F.browInner>0.5); setChip("frown",F.browDown>0.42);
+  setChip("gazeAway",!!Fraw.gazeAway);
+  setChip("leanIn",F.leanV>0.012);
+  setChip("tilt",Math.abs(F.roll)>15);
+  // 点头/摇头：姿态振荡
+  nodBuf.push({t:now,v:F.pitch}); shakeBuf.push({t:now,v:F.yaw});
+  while(nodBuf.length&&now-nodBuf[0].t>1400) nodBuf.shift();
+  while(shakeBuf.length&&now-shakeBuf[0].t>1400) shakeBuf.shift();
+  setChip("nod", oscillates(nodBuf,5));
+  setChip("shake", oscillates(shakeBuf,9));
+}
+function oscillates(buf, amp){
+  if(buf.length<6) return false;
+  let mn=9e9,mx=-9e9; for(const p of buf){ mn=Math.min(mn,p.v); mx=Math.max(mx,p.v); }
+  return (mx-mn)>amp && (mx-mn)<60;
+}
+
+/* ============================================================
+   手势识别（情绪价值核心）
+   ============================================================ */
+let lastHands=[];
+function runGestures(nowp, faceLm){
+  if(!gestureRecognizer) return;
+  if(nowp-lastGestRun<80) return;        // ~12fps，保护 rPPG 帧率
+  lastGestRun=nowp;
+  let ts=nowp; if(ts<=gestTs) ts=gestTs+1; gestTs=ts;   // 时间戳须严格递增
+  let gr; try{ gr=gestureRecognizer.recognizeForVideo(video, ts); }catch(e){ return; }
+  const hands=gr.landmarks||[];
+  lastHands=hands;
+  if(hands.length===0){ curGestKey="none"; handNearFace=false; wristHist.length=0; return; }
+
+  // 内置类别（7 种）
+  let builtin="none";
+  if(gr.gestures && gr.gestures[0] && gr.gestures[0][0]){
+    const c=gr.gestures[0][0];
+    if(c.score>0.5) builtin=GEST_MAP[c.categoryName]||"none";
+  }
+  // 自定义优先：比心 / OK / 挥手 / 托腮
+  const custom=classifyCustom(hands[0], faceLm, nowp);
+  let key = custom || builtin;
+  // 双手比心
+  if(hands.length>=2){ const cA=centroid(hands[0]), cB=centroid(hands[1]);
+    if(Math.hypot(cA.x-cB.x,cA.y-cB.y)<0.24) key="twoHeart"; }
+  curGestKey=key;
+  if(key!=="none") onGesture(key, nowp);
+}
+function classifyCustom(h, faceLm, nowp){
+  const sz=handSize(h);
+  const pinch=dist(h[4],h[8])/sz < 0.45;
+  const idxE=fingerExt(h,8,6), midE=fingerExt(h,12,10), ringE=fingerExt(h,16,14), pinkyE=fingerExt(h,20,18);
+  // 托腮：手靠近下巴/脸颊
+  handNearFace=false;
+  if(faceLm){
+    const c=centroid(h), fw=Math.abs(faceLm[234].x-faceLm[454].x)||0.2;
+    const near=Math.min(dist(c,faceLm[152]),dist(c,faceLm[234]),dist(c,faceLm[454]),dist(h[8],faceLm[152]));
+    if(near<fw*0.6) handNearFace=true;
+  }
+  if(pinch && !midE && !ringE && !pinkyE) return "fingerHeart";   // 🫰 其余蜷曲
+  if(pinch && midE && ringE && pinkyE)   return "ok";             // 👌 其余伸直
+  if(idxE && midE && ringE && pinkyE){                            // 张开手掌 → 检测挥手
+    wristHist.push({t:nowp,x:h[0].x});
+    while(wristHist.length && nowp-wristHist[0].t>900) wristHist.shift();
+    if(isWaving()) return "wave";
+  } else wristHist.length=0;
+  if(handNearFace && !pinch) return "thinking";
+  return null;
+}
+function isWaving(){
+  if(wristHist.length<5) return false;
+  let mn=9e9,mx=-9e9,changes=0,prev=0;
+  for(let i=1;i<wristHist.length;i++){ const dx=wristHist[i].x-wristHist[i-1].x;
+    if(Math.abs(dx)>0.004 && Math.sign(dx)!==prev){ changes++; prev=Math.sign(dx); } }
+  for(const p of wristHist){ mn=Math.min(mn,p.x); mx=Math.max(mx,p.x); }
+  return (mx-mn)>0.06 && changes>=2;
+}
+function onGesture(key, nowp){
+  if(!gesturesSeen.has(key)){ gesturesSeen.add(key); markGestureSeen(key);
+    if(gesturesSeen.size>=6) unlock("gcollect"); }
+  if(key==="fingerHeart"||key==="iloveyou"||key==="twoHeart") unlock("heart");
+  if(key==="thinking") return;                 // 托腮只助推意图，不弹特效
+  if(key===lastFiredKey && nowp-lastFiredAt<1800) return;
+  if(nowp-lastFiredAt<650) return;
+  lastFiredKey=key; lastFiredAt=nowp;
+  const G=GEST[key]; if(!G) return;
+  showGesturePop(G); showBubble(rand(G.msg), nowp);
+  energy=clamp(energy+(G.energy||4),0,100);
+  pushTimeline(G.emoji); flashGestCell(key);
+  for(let i=0;i<8;i++) parts.push(mkPart(fx.clientWidth*0.5+(Math.random()-.5)*150, fx.clientHeight*0.45, rand(G.parts)));
+}
+function showGesturePop(G){ gpopE.textContent=G.emoji; gpopL.textContent=G.zh;
+  gpop.classList.remove("show"); void gpop.offsetWidth; gpop.classList.add("show"); }
+function markGestureSeen(key){ const c=document.getElementById("gcell-"+key); if(c) c.classList.add("got");
+  gestCount.textContent=`${gesturesSeen.size} / ${GEST_ORDER.length}`; }
+function flashGestCell(key){ const c=document.getElementById("gcell-"+key); if(!c) return;
+  c.classList.remove("flash"); void c.offsetWidth; c.classList.add("flash"); }
+/* 手部几何 */
+function dist(a,b){ return Math.hypot(a.x-b.x,a.y-b.y); }
+function handSize(h){ return Math.max(0.05, dist(h[0],h[9])); }
+function fingerExt(h,tip,pip){ return dist(h[tip],h[0]) > dist(h[pip],h[0])*1.06; }
+function centroid(h){ let x=0,y=0; for(const p of h){ x+=p.x; y+=p.y; } return {x:x/h.length,y:y/h.length}; }
+function drawHands(hands){
+  if(!hands||!hands.length) return;
+  const CONN=(vision.HandLandmarker&&vision.HandLandmarker.HAND_CONNECTIONS)||(vision.GestureRecognizer&&vision.GestureRecognizer.HAND_CONNECTIONS);
+  meshCtx.save(); meshCtx.shadowColor="#21e6ff"; meshCtx.shadowBlur=8;
+  for(const h of hands){
+    if(CONN) drawUtils.drawConnectors(h, CONN, {color:"rgba(33,230,255,.7)", lineWidth:3});
+    meshCtx.fillStyle="rgba(255,255,255,.92)";
+    for(const p of h){ meshCtx.beginPath(); meshCtx.arc(p.x*mesh.width,p.y*mesh.height,2.6,0,7); meshCtx.fill(); }
+  }
+  meshCtx.restore();
+}
+
+/* ============================================================
+   能量 / 成就 / 气泡 / 时间轴
+   ============================================================ */
+function updateEnergy(emo, now){
+  const dt=0.033;
+  if(emo.key==="happy"||emo.key==="excited"||emo.key==="relaxed"){ energy+=10*dt; }
+  else if(emo.key==="anxious"||emo.key==="angry"||emo.key==="sad"||emo.key==="fear"){ energy-=4*dt; }
+  else energy+=(52-energy)*0.2*dt;
+  energy=clamp(energy,0,100);
+  energyVal.textContent=Math.round(energy); energyBar.style.width=energy+"%";
+  // 专注/平静计时
+  if(curIntent==="focused"){ focusTimer+=dt; if(focusTimer>10) unlock("focus"); } else focusTimer=0;
+  if(stress<30){ streakTxt.innerHTML=`身心放松中 🍃 压力低至 <b>${Math.round(stress)}</b>，很棒的状态`; }
+  else if(emo.key==="happy"||emo.key==="excited"){ streakTxt.innerHTML=`读到你的好心情啦，能量在上涨 ⚡`; }
+  else streakTxt.innerHTML=`灵犀在你身边，慢慢来 ✨`;
+}
+function unlock(id){
+  if(achvGot.has(id)) return; achvGot.add(id);
+  const a=ACHV.find(x=>x.id===id); if(!a) return;
+  const row=document.getElementById("achv-"+id); if(row) row.classList.add("got");
+  toast(a.emoji,`成就解锁 · ${a.name}`); confetti();
+}
+function toast(emoji,txt){ const t=document.createElement("div"); t.className="toast"; t.innerHTML=`<span class="te">${emoji}</span>${txt}`;
+  $("#toasts").appendChild(t); setTimeout(()=>t.remove(),3300); }
+function showBubble(txt, now){ oBubble.innerHTML=txt; oBubble.classList.add("show"); lastBubbleAt=now||performance.now();
+  orb.style.transform="scale(1.12)"; setTimeout(()=>orb.style.transform="",260);
+  clearTimeout(showBubble._t); showBubble._t=setTimeout(()=>oBubble.classList.remove("show"),4200); }
+function pushTimeline(emoji){ timeline.push(emoji); if(timeline.length>12) timeline.shift(); timelineEl.innerHTML=timeline.map(e=>`<span>${e}</span>`).join(""); }
+function rotateQuote(){ let i; do{ i=(Math.random()*QUOTES.length)|0; }while(i===quoteIdx&&QUOTES.length>1); quoteIdx=i;
+  quoteEl.style.opacity=0; setTimeout(()=>{ quoteEl.textContent=QUOTES[i]; quoteEl.style.transition="opacity .5s"; quoteEl.style.opacity=1; },220); }
+function rand(a){ return a[(Math.random()*a.length)|0]; }
+
+/* ============================================================
+   心跳脉动(按测得心率驱动)
+   ============================================================ */
+function beatTick(nowp){
+  if(!hr || hrConf<0.2){ return; }
+  const interval=60000/hr;
+  if(nowp-lastBeatAt>=interval){
+    lastBeatAt=nowp;
+    heart.classList.remove("beat"); void heart.offsetWidth; heart.classList.add("beat");
+    pulseRing.classList.add("beat"); setTimeout(()=>pulseRing.classList.remove("beat"),130);
+  }
+}
+
+/* ============================================================
+   绘制：ROI / 眼神 / 轮廓
+   ============================================================ */
+function mx(x){ return mirror? (1-x):x; }
+function drawOverlay(lm, pose){
+  const W=mesh.width, H=mesh.height, col=EMO[headlineEmo].color;
+  if(showRoi){
+    const faceW=Math.abs(lm[234].x-lm[454].x)*W, faceH=Math.abs(lm[10].y-lm[152].y)*H;
+    const fc={x:mx((lm[10].x+lm[9].x)/2)*W, y:(lm[10].y+lm[9].y)/2*H};
+    const lc={x:mx(lm[117].x)*W, y:lm[117].y*H}, rc={x:mx(lm[346].x)*W, y:lm[346].y*H};
+    meshCtx.save();
+    meshCtx.strokeStyle="rgba(33,230,255,.9)"; meshCtx.lineWidth=2; meshCtx.shadowColor="#21e6ff"; meshCtx.shadowBlur=10;
+    const beatGlow = (performance.now()-lastBeatAt)<140;
+    meshCtx.globalAlpha = beatGlow?1:0.6;
+    roiBox(fc.x,fc.y,faceW*0.30,faceH*0.16); roiBox(lc.x,lc.y,faceW*0.16,faceH*0.13); roiBox(rc.x,rc.y,faceW*0.16,faceH*0.13);
+    meshCtx.globalAlpha=1; meshCtx.fillStyle="rgba(33,230,255,.85)"; meshCtx.font="600 13px sans-serif";
+    meshCtx.shadowBlur=0; meshCtx.fillText("rPPG 信号区", fc.x-faceW*0.15, fc.y-faceH*0.10);
+    meshCtx.restore();
+  }
+  // 轮廓描边(随情绪变色)
+  const FL=vision.FaceLandmarker;
+  meshCtx.save(); meshCtx.shadowColor=col; meshCtx.shadowBlur=8;
+  const opt={color:hexA(col,.85),lineWidth:1.6};
+  drawUtils.drawConnectors(lm,FL.FACE_LANDMARKS_FACE_OVAL,opt);
+  drawUtils.drawConnectors(lm,FL.FACE_LANDMARKS_LEFT_EYE,opt);
+  drawUtils.drawConnectors(lm,FL.FACE_LANDMARKS_RIGHT_EYE,opt);
+  meshCtx.restore();
+}
+function roiBox(cx,cy,w,h){ const r=6,x=cx-w/2,y=cy-h/2;
+  meshCtx.beginPath(); meshCtx.moveTo(x+r,y); meshCtx.arcTo(x+w,y,x+w,y+h,r); meshCtx.arcTo(x+w,y+h,x,y+h,r);
+  meshCtx.arcTo(x,y+h,x,y,r); meshCtx.arcTo(x,y,x+w,y,r); meshCtx.stroke(); }
+
+/* ---- ECG 波形 ---- */
+function drawEcg(){
+  const w=ecg.width, h=ecg.height, c=ecgCtx;
+  c.clearRect(0,0,w,h);
+  if(wave.length<2) return;
+  let mn=9e9,mx2=-9e9; for(const v of wave){ mn=Math.min(mn,v); mx2=Math.max(mx2,v); }
+  const rng=(mx2-mn)||1;
+  c.beginPath();
+  const col = hrConf>0.35?"#21e6ff":"#5d6f93";
+  c.strokeStyle=col; c.lineWidth=2; c.shadowColor=col; c.shadowBlur=8; c.lineJoin="round";
+  for(let i=0;i<wave.length;i++){
+    const x=i/(wave.length-1)*w, y=h-8-((wave[i]-mn)/rng)*(h-16);
+    i?c.lineTo(x,y):c.moveTo(x,y);
+  }
+  c.stroke(); c.shadowBlur=0;
+}
+/* ---- 情绪坐标 ---- */
+let vaTrail=[];
+function drawVA(emo){
+  const w=va.width, h=va.height, c=vaCtx;
+  c.clearRect(0,0,w,h);
+  c.strokeStyle="rgba(120,160,220,.18)"; c.lineWidth=1;
+  c.beginPath(); c.moveTo(w/2,6); c.lineTo(w/2,h-6); c.moveTo(6,h/2); c.lineTo(w-6,h/2); c.stroke();
+  const x=emo.V*(w-20)+10, y=(1-emo.A)*(h-20)+10;
+  vaTrail.push({x,y}); if(vaTrail.length>22) vaTrail.shift();
+  for(let i=0;i<vaTrail.length;i++){ const p=vaTrail[i], al=i/vaTrail.length*0.5;
+    c.beginPath(); c.fillStyle=hexA(EMO[emo.key].color,al); c.arc(p.x,p.y,3+i*0.2,0,7); c.fill(); }
+  c.beginPath(); c.fillStyle=EMO[emo.key].color; c.shadowColor=EMO[emo.key].color; c.shadowBlur=14;
+  c.arc(x,y,7,0,7); c.fill(); c.shadowBlur=0;
+  c.fillStyle="#fff"; c.font="700 12px sans-serif"; c.textAlign="center";
+  c.fillText(EMO[emo.key].emoji+" "+EMO[emo.key].zh, x, y-12);
+}
+
+/* ============================================================
+   粒子
+   ============================================================ */
+let parts=[];
+const EMO_PARTS={excited:["✨","🎉","⚡","🌟"],happy:["💛","✨","😄"],calm:["💧","🌿"],relaxed:["🍃","💤","☁️"],
+  surprised:["❕","✨","👀"],anxious:["💦","〰️"],angry:["💢","🔥"],sad:["💧","🩶"],fear:["💦"],disgust:["🍃"],tired:["💤","🌙"]};
+function spawnBurst(key){ const c={x:fx.clientWidth*0.5,y:fx.clientHeight*0.4};
+  const arr=EMO_PARTS[key]||["✨"]; for(let i=0;i<6;i++) parts.push(mkPart(c.x+(Math.random()-.5)*120,c.y,rand(arr))); }
+function confetti(){ for(let i=0;i<18;i++) parts.push(mkPart(fx.clientWidth/2,fx.clientHeight*0.45,rand(["🎉","✨","💫","⭐","🔮"]))); }
+function mkPart(x,y,emoji){ return {x,y,vx:(Math.random()-.5)*1.8,vy:-1.0-Math.random()*1.8,life:1,emoji,size:18+Math.random()*16,rot:(Math.random()-.5)*0.4,vr:(Math.random()-.5)*0.12}; }
+function drawFx(){
+  fxCtx.clearRect(0,0,fx.clientWidth,fx.clientHeight);
+  for(let i=parts.length-1;i>=0;i--){ const p=parts[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.035; p.rot+=p.vr; p.life-=0.012;
+    if(p.life<=0){ parts.splice(i,1); continue; }
+    fxCtx.save(); fxCtx.globalAlpha=clamp(p.life,0,1); fxCtx.translate(p.x,p.y); fxCtx.rotate(p.rot);
+    fxCtx.font=p.size+"px serif"; fxCtx.textAlign="center"; fxCtx.textBaseline="middle"; fxCtx.fillText(p.emoji,0,0); fxCtx.restore(); }
+  if(parts.length>160) parts.splice(0,parts.length-160);
+}
+
+/* ============================================================
+   头部姿态 / 画布尺寸
+   ============================================================ */
+function headPose(d){
+  const r00=d[0],r10=d[1],r20=d[2], r21=d[6], r22=d[10];
+  const sy=Math.hypot(r00,r10), D=180/Math.PI;
+  return {pitch:Math.atan2(r21,r22)*D, yaw:Math.atan2(-r20,sy)*D, roll:Math.atan2(r10,r00)*D};
+}
+function sizeCanvases(){
+  mesh.width=video.videoWidth||1280; mesh.height=video.videoHeight||720;
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  for(const cv of [fx]){ cv.width=cv.clientWidth*dpr; cv.height=cv.clientHeight*dpr; cv.getContext("2d").setTransform(dpr,0,0,dpr,0,0); }
+  ecg.width=ecg.clientWidth*dpr; ecg.height=ecg.clientHeight*dpr; ecgCtx.setTransform(dpr,0,0,dpr,0,0);
+  va.width=va.clientWidth*dpr; va.height=va.clientHeight*dpr; vaCtx.setTransform(dpr,0,0,dpr,0,0);
+  applyMirror();
+}
+function applyMirror(){ video.classList.toggle("mirror",mirror); mesh.classList.toggle("mirror",mirror); }
+video.addEventListener("loadedmetadata",()=>{ if(running) sizeCanvases(); });
+window.addEventListener("resize",()=>{ if(running) sizeCanvases(); });
+window.addEventListener("orientationchange",()=>{ setTimeout(()=>{ if(running) sizeCanvases(); },350); });
+
+/* ============================================================
+   呼吸教练
+   ============================================================ */
+let breathTimer=null;
+function startBreath(){
+  breath.classList.add("on");
+  const seq=[["吸气",4000,1.35],["屏住",2000,1.35],["呼气",6000,0.7],["放松",1000,0.85]];
+  let i=0, rounds=0;
+  function step(){
+    const [label,dur,scale]=seq[i];
+    breathPhase.textContent=label;
+    breathOrb.style.transitionDuration=(dur/1000)+"s";
+    breathOrb.style.transform=`scale(${scale})`;
+    i++; if(i>=seq.length){ i=0; rounds++; }
+    if(rounds>=3 && i===0){ setTimeout(endBreath,800); return; }
+    breathTimer=setTimeout(step,dur);
+  }
+  step();
+}
+function endBreath(){
+  breath.classList.remove("on"); clearTimeout(breathTimer);
+  $("#btnBreath").classList.remove("active");
+  unlock("breath"); showBubble("做得很好～有没有觉得心跳慢下来、肩膀松了一点？🍃");
+}
+$("#breathClose").onclick=endBreath;
+
+/* ============================================================
+   读心卡截图
+   ============================================================ */
+function snapshot(){
+  if(!running) return;
+  const W=video.videoWidth||1280, H=video.videoHeight||720;
+  const c=document.createElement("canvas"); c.width=W; c.height=H; const x=c.getContext("2d");
+  x.save(); if(mirror){ x.translate(W,0); x.scale(-1,1); } x.drawImage(video,0,0,W,H); x.restore();
+  const grad=x.createLinearGradient(0,H-230,0,H);
+  grad.addColorStop(0,"rgba(4,7,15,0)"); grad.addColorStop(1,"rgba(4,7,15,.9)");
+  x.fillStyle=grad; x.fillRect(0,H-230,W,230);
+  const E=EMO[headlineEmo], I=INTENT[curIntent];
+  x.textBaseline="alphabetic";
+  x.font="64px serif"; x.fillText(E.emoji,36,H-118);
+  x.fillStyle=E.color; x.font="800 46px 'PingFang SC','Microsoft YaHei',sans-serif"; x.fillText(E.zh,118,H-126);
+  x.fillStyle="#eaf2ff"; x.font="600 26px 'PingFang SC','Microsoft YaHei',sans-serif";
+  x.fillText(`${I.icon} ${I.zh}`, 122, H-92);
+  x.fillStyle="#bcd0f0"; x.font="22px 'PingFang SC','Microsoft YaHei',sans-serif";
+  x.fillText(`❤️ ${hr?Math.round(hr):"--"} BPM   🫁 ${br?Math.round(br):"--"}/分   🩸 ${spo2?spo2.toFixed(0):"--"}%   🧘 压力 ${Math.round(stress)}`, 36, H-52);
+  x.fillStyle="#8fa6cc"; x.font="18px 'PingFang SC','Microsoft YaHei',sans-serif"; x.fillText("读心依据："+(lastEvi||"—"),36,H-24);
+  x.fillStyle="rgba(33,230,255,.85)"; x.font="700 22px sans-serif"; x.textAlign="right"; x.fillText("灵犀 · AI 读心仪 🔮",W-28,H-26);
+  const a=document.createElement("a"); a.download=`灵犀读心卡_${new Date().toISOString().slice(0,19).replace(/[:T]/g,"-")}.png`;
+  a.href=c.toDataURL("image/png"); a.click(); toast("📸","读心卡已保存！");
+}
+
+/* ============================================================
+   停止 / 控制 / 事件
+   ============================================================ */
+function recalibrate(){
+  calibrating=true; calStart=performance.now(); baseSamples=[]; hrBaseVal=0; hrBase.textContent="--";
+  showBubble("重新校准基线中…保持平静，看着镜头 5 秒就好 🎚️");
+}
+function stop(){
+  running=false; cancelAnimationFrame(rafId);
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+  liveDot.classList.remove("live"); statusTxt.textContent="已停止"; scan.classList.remove("on");
+  meshCtx.clearRect(0,0,mesh.width,mesh.height); parts=[]; lastHands=[]; wristHist.length=0; drawFx();
+  orb.style.display="none"; oBubble.classList.remove("show"); gpop.classList.remove("show"); breath.classList.remove("on");
+  gate.classList.remove("hide");
+  gateInner.innerHTML=`<div class="big">🔮👋</div><h2>灵犀先合上眼啦</h2><p>想再被读读心，随时回来 💙</p>
+    <button class="cta" id="restartBtn">📷 重新开始</button>
+    <div class="privacy">🔒 画面只在本地处理，从不上传</div>`;
+  $("#restartBtn").onclick=start;
+}
+function hexA(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
+$("#startBtn").onclick=start;
+$("#btnMirror").onclick=e=>{ mirror=!mirror; applyMirror(); e.currentTarget.classList.toggle("active",mirror); };
+$("#btnRoi").onclick=e=>{ showRoi=!showRoi; e.currentTarget.classList.toggle("active",showRoi); };
+$("#btnRoi").classList.add("active");
+$("#btnCal").onclick=recalibrate;
+$("#btnBreath").onclick=e=>{ if(breath.classList.contains("on")){ endBreath(); } else { e.currentTarget.classList.add("active"); startBreath(); } };
+$("#btnShot").onclick=snapshot;
+$("#btnStop").onclick=stop;
+window.addEventListener("keydown",e=>{ if(!running) return; const k=e.key.toLowerCase();
+  if(k==="m") $("#btnMirror").click(); else if(k==="r") $("#btnRoi").click();
+  else if(k==="b") $("#btnBreath").click(); else if(k==="s") snapshot(); });
+</script>
+</body>
+</html>
