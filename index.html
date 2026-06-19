@@ -399,6 +399,7 @@
     <button class="btn" id="btnRoi">🎯 信号区</button>
     <button class="btn" id="btnCal">🎚️ 校准基线</button>
     <button class="btn" id="btnBreath">🫁 深呼吸</button>
+    <button class="btn active" id="btnSound">🔊 声音</button>
     <button class="btn" id="btnShot">📸 读心卡</button>
     <button class="btn" id="btnStop">⏹️ 停止</button>
   </div>
@@ -566,6 +567,77 @@ let curGestKey="none", lastFiredKey="none", lastFiredAt=0, gesturesSeen=new Set(
 let wristHist=[];                // {t,x} 用于挥手检测
 let handNearFace=false;          // 托腮 → 助推"若有所思"
 
+/* ============================================================
+   声音引擎（Web Audio 程序化合成 + 语音，情绪价值）
+   ============================================================ */
+let actx=null, masterGain=null, soundOn=true, ambient=null, zhVoice=null, lastSpeakAt=0;
+function initAudio(){
+  if(actx) return;
+  try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
+  masterGain=actx.createGain(); masterGain.gain.value=soundOn?0.85:0; masterGain.connect(actx.destination);
+  startAmbient();
+  if(window.speechSynthesis){ pickVoice(); speechSynthesis.onvoiceschanged=pickVoice; }
+}
+function resumeAudio(){ try{ if(actx&&actx.state!=="running") actx.resume(); }catch(e){} }
+function pickVoice(){ try{ const vs=speechSynthesis.getVoices();
+  zhVoice = vs.find(v=>/zh/i.test(v.lang)) || vs.find(v=>/Chinese|中文|普通话|Yaoyao|Xiaoxiao|Huihui|Mandarin/i.test(v.name)) || null; }catch(e){} }
+/* —— 心跳：lub-dub，按测得 BPM 触发 —— */
+function playHeartbeat(){ if(!actx||!soundOn) return; thump(58,0.42,0); thump(44,0.26,0.15); }
+function thump(freq,vol,delay){
+  const t=actx.currentTime+delay, o=actx.createOscillator(), g=actx.createGain(), lp=actx.createBiquadFilter();
+  o.type="sine"; o.frequency.setValueAtTime(freq*1.9,t); o.frequency.exponentialRampToValueAtTime(freq,t+0.06);
+  lp.type="lowpass"; lp.frequency.value=170;
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.012); g.gain.exponentialRampToValueAtTime(0.0001,t+0.24);
+  o.connect(lp); lp.connect(g); g.connect(masterGain); o.start(t); o.stop(t+0.28);
+}
+/* —— 通用音符 / 琶音 —— */
+function tone(freq,dur,vol,type,delay,glideTo){ if(!actx||!soundOn) return;
+  const t=actx.currentTime+(delay||0), o=actx.createOscillator(), g=actx.createGain();
+  o.type=type||"sine"; o.frequency.setValueAtTime(freq,t); if(glideTo) o.frequency.exponentialRampToValueAtTime(glideTo,t+dur);
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g); g.connect(masterGain); o.start(t); o.stop(t+dur+0.05); }
+function arp(freqs,vol,step,type){ (freqs||[]).forEach((f,i)=>tone(f,0.36,vol,type||"triangle",i*(step||0.07))); }
+/* —— 手势奖励音 —— */
+const GCHIME={ fingerHeart:[523.3,659.3,784,1046.5], iloveyou:[523.3,659.3,784,1046.5], twoHeart:[523.3,659.3,784,1318.5],
+  thumbUp:[659.3,987.8], victory:[587.3,880], openPalm:[523.3,784], fist:[392,587.3], ok:[659.3,880],
+  pointUp:[784,1046.5], wave:[659.3,830.6,987.8], thumbDown:[330,247] };
+function playGesture(key){ arp(GCHIME[key]||[660,880],0.17, key==="thumbDown"?0.12:0.06, "triangle"); }
+/* —— 情绪音(效价决定大小调) / 成就 —— */
+function playEmotion(V){ arp(V>=0.5?[523.3,659.3,784]:[523.3,622.3,740],0.07,0.09,"sine"); }
+function playUnlock(){ arp([523.3,659.3,784,1046.5,1318.5],0.18,0.07,"triangle"); }
+/* —— 呼吸引导音 —— */
+function breathSound(rising){ if(!actx||!soundOn) return;
+  tone(rising?330:392, 2.2, 0.12, "sine", 0, rising?392:294); }
+/* —— 氛围垫(极轻，随情绪微变) —— */
+function startAmbient(){ if(!actx) return;
+  const g=actx.createGain(); g.gain.value=0; g.connect(masterGain);
+  const lp=actx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=560; lp.connect(g);
+  const o1=actx.createOscillator(); o1.type="sine"; o1.frequency.value=110;
+  const o2=actx.createOscillator(); o2.type="sine"; o2.frequency.value=164.8;
+  o1.connect(lp); o2.connect(lp);
+  const lfo=actx.createOscillator(); lfo.type="sine"; lfo.frequency.value=0.07;
+  const lfoG=actx.createGain(); lfoG.gain.value=110; lfo.connect(lfoG); lfoG.connect(lp.frequency);
+  o1.start(); o2.start(); lfo.start();
+  g.gain.linearRampToValueAtTime(0.02, actx.currentTime+4);
+  ambient={g,lp,o2}; }
+function setAmbientMood(V){ if(!ambient) return;
+  try{ ambient.lp.frequency.setTargetAtTime(420+V*560, actx.currentTime,1.5);
+       ambient.o2.frequency.setTargetAtTime(V>=0.5?164.8:155.6, actx.currentTime,1.5); }catch(e){} }
+/* —— 灵犀语音(去除 html/emoji，节流) —— */
+function speakMsg(text, force){
+  if(!soundOn||!window.speechSynthesis) return;
+  const now=performance.now(); if(!force && now-lastSpeakAt<4500) return;
+  let clean=(text||"").replace(/<[^>]*>/g,"");
+  try{ clean=clean.replace(/\p{Extended_Pictographic}|[☀-➿️‍]/gu,""); }catch(e){}
+  clean=clean.replace(/\s+/g," ").trim(); if(!clean) return;
+  lastSpeakAt=now;
+  try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(clean);
+    if(zhVoice) u.voice=zhVoice; u.lang="zh-CN"; u.rate=0.95; u.pitch=1.1; u.volume=1; speechSynthesis.speak(u); }catch(e){}
+}
+function setSound(on){ soundOn=on;
+  if(masterGain) try{ masterGain.gain.setTargetAtTime(on?0.85:0, actx.currentTime, 0.05); }catch(e){}
+  if(!on && window.speechSynthesis) try{ speechSynthesis.cancel(); }catch(e){} }
+
 /* ---------------- 多模态特征(平滑) ---------------- */
 const F={};   // 平滑后的特征
 const Fraw={};
@@ -610,7 +682,9 @@ async function start(){
   liveDot.classList.add("live"); statusTxt.textContent="读心中";
   acq.style.display=""; acqTxt.style.display="";
   running=true; calibrating=true; calStart=performance.now(); baseSamples=[];
+  initAudio(); resumeAudio();
   unlock("first"); showBubble("灵犀已连接～放轻松，对准镜头，先让我读读你的心跳 ❤️");
+  speakMsg("灵犀已连接，放轻松，先让我读读你的心跳", true);
   lastVideoTime=-1; loop();
 }
 function createLM(fileset,delegate){
@@ -997,8 +1071,9 @@ function updateEmotion(emo, now){
     emotionsSeen.add(emo.key); if(emotionsSeen.size>=5) unlock("varied");
     if(emo.key==="happy"||emo.key==="excited") unlock("smile");
     pushTimeline(E.emoji);
-    if(now-lastBubbleAt>4200) showBubble(rand(EMSG[emo.key]||["灵犀读到你啦 ✨"]), now);
+    if(now-lastBubbleAt>4200){ const m=rand(EMSG[emo.key]||["灵犀读到你啦 ✨"]); showBubble(m, now); speakMsg(m); }
     spawnBurst(emo.key);
+    playEmotion(emo.V); setAmbientMood(emo.V);
   }
   emoSub.textContent = `效价 ${(emo.V*100|0)} · 唤醒 ${(emo.A*100|0)}`;
   emoConf.style.width=Math.round(emo.conf*100)+"%";
@@ -1007,6 +1082,7 @@ function updateEmotion(emo, now){
   // 高压力时主动安抚
   if(stress>72 && now-lastBubbleAt>9000 && !breath.classList.contains("on")){
     showBubble("心跳和呼吸都有点急…要不要点「🫁 深呼吸」，灵犀陪你 30 秒？", now);
+    speakMsg("心跳和呼吸都有点急，要不要跟我一起深呼吸");
   }
 }
 
@@ -1161,7 +1237,10 @@ function onGesture(key, nowp){
   if(nowp-lastFiredAt<650) return;
   lastFiredKey=key; lastFiredAt=nowp;
   const G=GEST[key]; if(!G) return;
-  showGesturePop(G); showBubble(rand(G.msg), nowp);
+  const m=rand(G.msg);
+  showGesturePop(G); showBubble(m, nowp);
+  playGesture(key);
+  if(key==="fingerHeart"||key==="iloveyou"||key==="twoHeart"||key==="thumbUp") speakMsg(m, true);
   energy=clamp(energy+(G.energy||4),0,100);
   pushTimeline(G.emoji); flashGestCell(key);
   for(let i=0;i<8;i++) parts.push(mkPart(fx.clientWidth*0.5+(Math.random()-.5)*150, fx.clientHeight*0.45, rand(G.parts)));
@@ -1209,7 +1288,7 @@ function unlock(id){
   if(achvGot.has(id)) return; achvGot.add(id);
   const a=ACHV.find(x=>x.id===id); if(!a) return;
   const row=document.getElementById("achv-"+id); if(row) row.classList.add("got");
-  toast(a.emoji,`成就解锁 · ${a.name}`); confetti();
+  toast(a.emoji,`成就解锁 · ${a.name}`); confetti(); playUnlock();
 }
 function toast(emoji,txt){ const t=document.createElement("div"); t.className="toast"; t.innerHTML=`<span class="te">${emoji}</span>${txt}`;
   $("#toasts").appendChild(t); setTimeout(()=>t.remove(),3300); }
@@ -1231,6 +1310,7 @@ function beatTick(nowp){
     lastBeatAt=nowp;
     heart.classList.remove("beat"); void heart.offsetWidth; heart.classList.add("beat");
     pulseRing.classList.add("beat"); setTimeout(()=>pulseRing.classList.remove("beat"),130);
+    playHeartbeat();
   }
 }
 
@@ -1352,6 +1432,8 @@ function startBreath(){
     breathPhase.textContent=label;
     breathOrb.style.transitionDuration=(dur/1000)+"s";
     breathOrb.style.transform=`scale(${scale})`;
+    if(label==="吸气"){ breathSound(true); speakMsg("吸气",true); }
+    else if(label==="呼气"){ breathSound(false); speakMsg("呼气",true); }
     i++; if(i>=seq.length){ i=0; rounds++; }
     if(rounds>=3 && i===0){ setTimeout(endBreath,800); return; }
     breathTimer=setTimeout(step,dur);
@@ -1362,6 +1444,7 @@ function endBreath(){
   breath.classList.remove("on"); clearTimeout(breathTimer);
   $("#btnBreath").classList.remove("active");
   unlock("breath"); showBubble("做得很好～有没有觉得心跳慢下来、肩膀松了一点？🍃");
+  speakMsg("做得很好，有没有觉得心跳慢下来了", true);
 }
 $("#breathClose").onclick=endBreath;
 
@@ -1403,6 +1486,8 @@ function stop(){
   liveDot.classList.remove("live"); statusTxt.textContent="已停止"; scan.classList.remove("on");
   meshCtx.clearRect(0,0,mesh.width,mesh.height); parts=[]; lastHands=[]; wristHist.length=0; drawFx();
   orb.style.display="none"; oBubble.classList.remove("show"); gpop.classList.remove("show"); breath.classList.remove("on");
+  if(window.speechSynthesis) try{ speechSynthesis.cancel(); }catch(e){}
+  try{ if(actx) actx.suspend(); }catch(e){}
   gate.classList.remove("hide");
   gateInner.innerHTML=`<div class="big">🔮👋</div><h2>灵犀先合上眼啦</h2><p>想再被读读心，随时回来 💙</p>
     <button class="cta" id="restartBtn">📷 重新开始</button>
@@ -1418,9 +1503,11 @@ $("#btnCal").onclick=recalibrate;
 $("#btnBreath").onclick=e=>{ if(breath.classList.contains("on")){ endBreath(); } else { e.currentTarget.classList.add("active"); startBreath(); } };
 $("#btnShot").onclick=snapshot;
 $("#btnStop").onclick=stop;
+$("#btnSound").onclick=e=>{ const on=!soundOn; setSound(on); if(on) resumeAudio();
+  e.currentTarget.classList.toggle("active",on); e.currentTarget.textContent=on?"🔊 声音":"🔇 静音"; };
 window.addEventListener("keydown",e=>{ if(!running) return; const k=e.key.toLowerCase();
   if(k==="m") $("#btnMirror").click(); else if(k==="r") $("#btnRoi").click();
-  else if(k==="b") $("#btnBreath").click(); else if(k==="s") snapshot(); });
+  else if(k==="b") $("#btnBreath").click(); else if(k==="v") $("#btnSound").click(); else if(k==="s") snapshot(); });
 </script>
 </body>
 </html>
